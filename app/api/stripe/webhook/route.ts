@@ -2,6 +2,12 @@ import Stripe from "stripe"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { rateLimit } from "@/lib/rate-limit"
+import {
+  sendPaymentConfirmationEmail,
+  sendReferralCommissionEmail,
+  sendAdminNewPaymentEmail,
+  sendPaymentFailedEmail,
+} from "@/lib/emails"
 
 export const dynamic = "force-dynamic"
 
@@ -56,17 +62,32 @@ export async function POST(request: Request) {
       const session = event.data.object as Stripe.Checkout.Session
       const metadata = session.metadata || {}
       const referralCode = metadata["referral_code"] || ""
-      const referredEmail = metadata["referred_email"] || ""
+      const referredEmail = metadata["referred_email"] || session.customer_email || ""
 
       const supabase = await createClient()
 
+      // Update referral status if applicable
+      let referrerEmail = ""
+      let commissionAmount = 10.0
       if (referralCode && referredEmail) {
-        await supabase
+        const { data: referralData } = await supabase
           .from("referrals")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .select("referrer_email, commission_amount")
           .eq("referrer_code", referralCode)
           .eq("referred_email", referredEmail)
-        // Silent error handling - referral update failures don't block webhook success
+          .single()
+
+        if (referralData) {
+          referrerEmail = referralData.referrer_email
+          commissionAmount = Number(referralData.commission_amount) || 10.0
+
+          await supabase
+            .from("referrals")
+            .update({ status: "completed", completed_at: new Date().toISOString() })
+            .eq("referrer_code", referralCode)
+            .eq("referred_email", referredEmail)
+          // Silent error handling - referral update failures don't block webhook success
+        }
       }
 
       // Track payment completion event in conversions table
@@ -80,8 +101,111 @@ export async function POST(request: Request) {
       } catch {
         // Silent error handling for conversion tracking
       }
+
+      // Send payment confirmation email
+      if (referredEmail) {
+        try {
+          // Get user data and report from Supabase
+          const { data: onboardingData } = await supabase
+            .from("onboarding_data")
+            .select("name, email")
+            .eq("email", referredEmail)
+            .single()
+
+          const { data: reportData } = await supabase
+            .from("reports")
+            .select("*")
+            .eq("user_email", referredEmail)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single()
+
+          if (onboardingData && reportData) {
+            const userName = onboardingData.name || referredEmail.split("@")[0]
+            const report = reportData.full_report || reportData.report_data?.full_report || reportData
+            const forces = reportData.hidden_forces || reportData.report_data?.hidden_forces
+            const revelations = reportData.insights || reportData.report_data?.insights || []
+
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+            const reportUrl = reportData.unique_link
+              ? `${baseUrl}/report?link=${reportData.unique_link}`
+              : `${baseUrl}/report`
+
+            await sendPaymentConfirmationEmail({
+              email: referredEmail,
+              userName,
+              reportData: report,
+              forces: forces || {},
+              revelations: revelations || [],
+              reportUrl,
+            })
+          }
+        } catch (error) {
+          console.error("[Webhook] Error sending payment confirmation email:", error)
+          // Silent error - don't block webhook
+        }
+
+        // Send referral commission email
+        if (referrerEmail) {
+          try {
+            await sendReferralCommissionEmail({
+              referrerEmail,
+              referredEmail,
+              commissionAmount,
+              referralCode,
+            })
+          } catch (error) {
+            console.error("[Webhook] Error sending referral commission email:", error)
+            // Silent error - don't block webhook
+          }
+        }
+
+        // Send admin notification
+        try {
+          const amount = session.amount_total ? session.amount_total / 100 : 47
+          await sendAdminNewPaymentEmail({
+            type: "new_payment",
+            data: {
+              email: referredEmail,
+              amount,
+              referralCode: referralCode || undefined,
+            },
+          })
+        } catch (error) {
+          console.error("[Webhook] Error sending admin notification:", error)
+          // Silent error - don't block webhook
+        }
+      }
+    } else if (event.type === "payment_intent.payment_failed") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+      const customerEmail = paymentIntent.metadata?.email || ""
+
+      if (customerEmail) {
+        try {
+          const { data: onboardingData } = await supabase
+            .from("onboarding_data")
+            .select("name")
+            .eq("email", customerEmail)
+            .single()
+
+          const userName = onboardingData?.name || customerEmail.split("@")[0]
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+          const retryUrl = `${baseUrl}/result`
+
+          await sendPaymentFailedEmail({
+            email: customerEmail,
+            userName,
+            failureReason: paymentIntent.last_payment_error?.message,
+            retryUrl,
+          })
+        } catch (error) {
+          console.error("[Webhook] Error sending payment failed email:", error)
+          // Silent error - don't block webhook
+        }
+      }
     }
-  } catch {
+  } catch (error) {
+    console.error("[Webhook] Error processing event:", error)
     // Return 500 so Stripe knows to retry the webhook
     return new NextResponse("Webhook error", { status: 500 })
   }

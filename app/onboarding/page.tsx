@@ -323,6 +323,23 @@ export default function OnboardingPage() {
 
     setUserData((prev) => ({ ...prev, email }))
 
+    // Send welcome email
+    ;(async () => {
+      try {
+        const { sendWelcomeEmail } = await import("@/lib/emails")
+        const baseUrl = window.location.origin
+        const quizUrl = `${baseUrl}/quiz`
+        
+        await sendWelcomeEmail({
+          email,
+          userName: userData.name || email.split("@")[0],
+          quizUrl,
+        })
+      } catch {
+        // Silent error - welcome email is optional
+      }
+    })()
+
     addBotMessage(`Perfect, ${userData.name}.`, () => {
       setMessages((prev) =>
         prev.map((msg, idx) => (idx === lastUserMessageIndex ? { ...msg, showReadReceipt: false } : msg)),

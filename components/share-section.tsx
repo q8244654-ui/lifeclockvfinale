@@ -13,7 +13,7 @@ export default function ShareSection({ archetype, lifeIndex }: ShareSectionProps
   const [copied, setCopied] = useState(false)
 
   const shareText = `I just discovered my LifeClock archetype: ${archetype} (${lifeIndex}/100). Do you know yours?`
-  const shareUrl = "https://lifeclock.app" // Replace with actual URL
+  const shareUrl = "https://lifeclock.quest"
 
   const handleShare = (platform: string) => {
     const encodedText = encodeURIComponent(shareText)

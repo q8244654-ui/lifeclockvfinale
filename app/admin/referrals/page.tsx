@@ -180,6 +180,14 @@ export default function AdminReferralsPage() {
 
     try {
       const supabase = createClient()
+      
+      // Get referral data before updating
+      const { data: referralData } = await supabase
+        .from("referrals")
+        .select("referrer_email, commission_amount")
+        .eq("id", referralId)
+        .single()
+
       const { error } = await supabase
         .from("referrals")
         .update({ status: "paid" })
@@ -187,6 +195,29 @@ export default function AdminReferralsPage() {
 
       if (error) {
         alert("Erreur lors de la mise à jour")
+      } else if (referralData) {
+        // Send commission paid email
+        try {
+          const { sendCommissionPaidEmail } = await import("@/lib/emails")
+          
+          // Get referrer name from onboarding data
+          const { data: onboardingData } = await supabase
+            .from("onboarding_data")
+            .select("name")
+            .eq("email", referralData.referrer_email)
+            .single()
+
+          const userName = onboardingData?.name || referralData.referrer_email.split("@")[0]
+          
+          await sendCommissionPaidEmail({
+            email: referralData.referrer_email,
+            userName,
+            amount: Number(referralData.commission_amount) || 10.0,
+          })
+        } catch (emailError) {
+          console.error("[Admin] Error sending commission paid email:", emailError)
+          // Silent error - don't block the update
+        }
       }
       // Le temps réel actualisera automatiquement les données
     } catch {

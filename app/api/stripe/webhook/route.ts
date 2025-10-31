@@ -182,6 +182,7 @@ export async function POST(request: Request) {
 
       if (customerEmail) {
         try {
+          const supabase = await createClient()
           const { data: onboardingData } = await supabase
             .from("onboarding_data")
             .select("name")

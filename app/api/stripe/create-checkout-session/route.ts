@@ -21,8 +21,21 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { referralCode, email, firstName, lastName } = createCheckoutSessionSchema.parse(body)
 
-    const origin = request.headers.get("origin") || request.headers.get("referer") || ""
-    const baseUrl = origin || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+    const origin = request.headers.get("origin") || ""
+    const referer = request.headers.get("referer") || ""
+    
+    // Extract base URL from referer if origin is not available
+    let baseUrl = origin
+    if (!baseUrl && referer) {
+      try {
+        const refererUrl = new URL(referer)
+        baseUrl = `${refererUrl.protocol}//${refererUrl.host}`
+      } catch {
+        // Invalid referer URL, fall through to default
+      }
+    }
+    
+    baseUrl = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -32,7 +45,7 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/generating`,
+      success_url: `${baseUrl}/report`,
       cancel_url: `${baseUrl}/result`,
       customer_email: email || undefined,
       // Apple Pay and Google Pay are automatically enabled when payment_method_types includes "card"

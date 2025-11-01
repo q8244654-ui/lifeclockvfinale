@@ -13,6 +13,7 @@ import ChartsSection from "@/components/charts-section"
 import PDFExportButton from "@/components/pdf-export-button"
 import ShareSection from "@/components/share-section"
 import ReferralSection from "@/components/referral-section"
+import SocialProofCounter from "@/components/social-proof-counter"
 import type { PhaseResult } from "@/lib/types"
 import { getLocalStorage } from "@/hooks/use-local-storage"
 import { STORAGE_KEYS } from "@/lib/constants"
@@ -28,7 +29,8 @@ export default function ReportPage() {
   const [userEmail, setUserEmail] = useState("")
 
   useEffect(() => {
-    const storedResults = getLocalStorage<PhaseResult[]>(STORAGE_KEYS.PHASES_RESULTS)
+    const storedResults = getLocalStorage<PhaseResult[]>(STORAGE_KEYS.PHASES_RESULTS) || 
+                          getLocalStorage<PhaseResult[]>(STORAGE_KEYS.ALL_RESULTS)
     const storedOnboarding = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
 
     if (!storedResults) {
@@ -162,6 +164,10 @@ export default function ReportPage() {
 
         {/* Revelations */}
         <Revelations revelations={revelations} />
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <SocialProofCounter />
+        </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <PDFExportButton userName={userName} finalReport={finalReport} forces={forces} revelations={revelations} />

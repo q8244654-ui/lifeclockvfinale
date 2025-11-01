@@ -12,6 +12,8 @@ interface ChatMessageProps {
   messageType?: "normal" | "motivation" | "revelation" | "introspection" | "humor"
   showReadReceipt?: boolean
   timestamp?: string
+  isRevealable?: boolean
+  onReveal?: () => void
 }
 
 export default function ChatMessage({
@@ -21,9 +23,13 @@ export default function ChatMessage({
   messageType = "normal",
   showReadReceipt = false,
   timestamp,
+  isRevealable = false,
+  onReveal,
 }: ChatMessageProps) {
   const isAssistant = role === "assistant"
   const [showReceipt, setShowReceipt] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isClicked, setIsClicked] = useState(false)
 
   useEffect(() => {
     if (showReadReceipt && !isAssistant) {
@@ -106,16 +112,48 @@ export default function ChatMessage({
             }}
           />
           <motion.div
-            className={`relative max-w-[80%] ${borderRadius.input} ${spacing.chatBubble} text-pretty ${typography.chatMessage}`}
+            className={`relative max-w-[80%] ${borderRadius.input} ${spacing.chatBubble} text-pretty ${typography.chatMessage} cursor-pointer transition-all`}
             style={{
               background: style.background,
               color: style.color,
-              boxShadow: style.glow,
+              boxShadow: isHovered ? `0 0 20px ${style.haloColor}80, ${style.glow}` : style.glow,
             }}
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300 }}
+            onHoverStart={() => setIsHovered(true)}
+            onHoverEnd={() => setIsHovered(false)}
+            onTap={() => {
+              setIsClicked(true)
+              setTimeout(() => setIsClicked(false), 200)
+              if (isRevealable && onReveal) {
+                onReveal()
+              }
+            }}
+            whileHover={{ 
+              scale: 1.03,
+              y: -2,
+            }}
+            whileTap={{ scale: 0.98 }}
+            animate={{
+              scale: isClicked ? 0.98 : isHovered ? 1.03 : 1,
+            }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
           >
-            <p>{text}</p>
+            <motion.p
+              animate={{
+                opacity: isHovered ? 1 : 0.95,
+              }}
+            >
+              {text}
+            </motion.p>
+            {isRevealable && !isHovered && (
+              <motion.div
+                className="absolute top-2 right-2 text-xs opacity-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                transition={{ delay: 1 }}
+              >
+                👆
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </motion.div>
@@ -135,14 +173,29 @@ export default function ChatMessage({
         damping: 20,
       }}
     >
-      <div
+      <motion.div
         className={cn(
           `max-w-[80%] ${borderRadius.input} ${spacing.chatBubble} text-pretty ${typography.chatMessage}`,
           isAssistant ? "imessage-bubble-assistant" : "imessage-bubble-user",
+          "cursor-pointer"
         )}
+        onHoverStart={() => setIsHovered(true)}
+        onHoverEnd={() => setIsHovered(false)}
+        whileHover={{ 
+          scale: 1.02,
+          y: -1,
+        }}
+        whileTap={{ scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        <p>{text}</p>
-      </div>
+        <motion.p
+          animate={{
+            opacity: isHovered ? 1 : 0.9,
+          }}
+        >
+          {text}
+        </motion.p>
+      </motion.div>
 
       {!isAssistant && showReceipt && timestamp && (
         <motion.div

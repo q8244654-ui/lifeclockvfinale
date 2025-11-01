@@ -131,7 +131,7 @@ export async function POST(request: Request) {
               ? `${baseUrl}/report?link=${reportData.unique_link}`
               : `${baseUrl}/report`
 
-            await sendPaymentConfirmationEmail({
+            const emailResult = await sendPaymentConfirmationEmail({
               email: referredEmail,
               userName,
               reportData: report,
@@ -139,6 +139,18 @@ export async function POST(request: Request) {
               revelations: revelations || [],
               reportUrl,
             })
+            
+            if (!emailResult.success) {
+              console.error('[Webhook] Failed to send payment confirmation email:', {
+                email: referredEmail,
+                error: emailResult.error,
+              })
+            } else {
+              console.log('[Webhook] Payment confirmation email sent successfully:', {
+                email: referredEmail,
+                emailId: emailResult.id,
+              })
+            }
           }
         } catch (error) {
           console.error("[Webhook] Error sending payment confirmation email:", error)
@@ -148,12 +160,24 @@ export async function POST(request: Request) {
         // Send referral commission email
         if (referrerEmail) {
           try {
-            await sendReferralCommissionEmail({
+            const referralEmailResult = await sendReferralCommissionEmail({
               referrerEmail,
               referredEmail,
               commissionAmount,
               referralCode,
             })
+            
+            if (!referralEmailResult.success) {
+              console.error('[Webhook] Failed to send referral commission email:', {
+                email: referrerEmail,
+                error: referralEmailResult.error,
+              })
+            } else {
+              console.log('[Webhook] Referral commission email sent successfully:', {
+                email: referrerEmail,
+                emailId: referralEmailResult.id,
+              })
+            }
           } catch (error) {
             console.error("[Webhook] Error sending referral commission email:", error)
             // Silent error - don't block webhook
@@ -163,7 +187,7 @@ export async function POST(request: Request) {
         // Send admin notification
         try {
           const amount = session.amount_total ? session.amount_total / 100 : 47
-          await sendAdminNewPaymentEmail({
+          const adminEmailResult = await sendAdminNewPaymentEmail({
             type: "new_payment",
             data: {
               email: referredEmail,
@@ -171,6 +195,16 @@ export async function POST(request: Request) {
               referralCode: referralCode || undefined,
             },
           })
+          
+          if (!adminEmailResult.success) {
+            console.error('[Webhook] Failed to send admin notification:', {
+              error: adminEmailResult.error,
+            })
+          } else {
+            console.log('[Webhook] Admin notification sent successfully:', {
+              emailId: adminEmailResult.id,
+            })
+          }
         } catch (error) {
           console.error("[Webhook] Error sending admin notification:", error)
           // Silent error - don't block webhook

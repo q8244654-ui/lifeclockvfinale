@@ -101,7 +101,7 @@ export default function GeneratingPage() {
       if (newProgress >= 100) {
         clearInterval(interval)
         setTimeout(() => {
-          router.push("/report")
+          router.push("/result")
         }, 2000)
       }
     }, 100)

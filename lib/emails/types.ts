@@ -22,6 +22,7 @@ export interface AbandonedCartData {
   email: string
   userName: string
   resultUrl: string
+  todayCount?: number
 }
 
 export interface ReferralCommissionData {
@@ -35,6 +36,7 @@ export interface WelcomeEmailData {
   email: string
   userName: string
   quizUrl: string
+  todayCount?: number
 }
 
 export interface PaymentFailedData {
@@ -61,6 +63,7 @@ export interface QuizAbandonmentData {
   email: string
   userName: string
   quizUrl: string
+  todayCount?: number
 }
 
 export interface AffiliateSummaryData {
@@ -94,6 +97,7 @@ export interface ReactivationData {
   userName: string
   resultUrl: string
   discountPercent?: number
+  todayCount?: number
 }
 
 export interface ReportRecoveryData {

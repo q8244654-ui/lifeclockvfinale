@@ -36,6 +36,13 @@ const adminEmail = process.env.ADMIN_EMAIL
 
 if (!resendApiKey) {
   console.warn('RESEND_API_KEY is not set. Email functionality will be disabled.')
+} else {
+  // Validate API key format (should start with 're_')
+  if (!resendApiKey.startsWith('re_')) {
+    console.error('[Email] RESEND_API_KEY format appears invalid. Expected format: re_xxxxxxxx')
+  } else {
+    console.log('[Email] Resend API key configured, from email:', fromEmail)
+  }
 }
 
 const resend = resendApiKey ? new Resend(resendApiKey) : null
@@ -47,6 +54,8 @@ async function sendEmail(to: string, subject: string, html: string, attachments?
   }
 
   try {
+    console.log(`[Email] Attempting to send email to ${to} with subject: ${subject}`)
+    
     const result = await resend.emails.send({
       from: fromEmail,
       to,
@@ -59,14 +68,36 @@ async function sendEmail(to: string, subject: string, html: string, attachments?
     })
 
     if (result.error) {
-      console.error('[Email] Error sending email:', result.error)
-      return { success: false, error: result.error }
+      const errorMessage = typeof result.error === 'object' 
+        ? JSON.stringify(result.error, null, 2)
+        : String(result.error)
+      console.error('[Email] Error sending email:', {
+        to,
+        subject,
+        error: errorMessage,
+        fullError: result.error,
+      })
+      return { success: false, error: errorMessage }
     }
 
-    return { success: true, id: result.data?.id }
+    if (result.data?.id) {
+      console.log(`[Email] Successfully sent email to ${to} - ID: ${result.data.id}`)
+      return { success: true, id: result.data.id }
+    } else {
+      console.warn(`[Email] Email sent but no ID returned for ${to}`, result)
+      return { success: true, id: undefined }
+    }
   } catch (error) {
-    console.error('[Email] Exception sending email:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('[Email] Exception sending email:', {
+      to,
+      subject,
+      error: errorMessage,
+      stack: errorStack,
+      fullError: error,
+    })
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -109,6 +140,7 @@ export async function sendAbandonedCartEmail(data: AbandonedCartData) {
     const html = getAbandonedCartTemplate({
       userName: data.userName,
       resultUrl: data.resultUrl,
+      todayCount: data.todayCount,
     })
 
     return await sendEmail(data.email, "Don't Miss Your LifeClock Report", html)
@@ -142,6 +174,7 @@ export async function sendWelcomeEmail(data: WelcomeEmailData) {
     const html = getWelcomeEmailTemplate({
       userName: data.userName,
       quizUrl: data.quizUrl,
+      todayCount: data.todayCount,
     })
 
     return await sendEmail(data.email, 'Welcome to LifeClock', html)
@@ -199,6 +232,7 @@ export async function sendQuizAbandonmentEmail(data: QuizAbandonmentData) {
     const html = getQuizAbandonmentTemplate({
       userName: data.userName,
       quizUrl: data.quizUrl,
+      todayCount: data.todayCount,
     })
 
     return await sendEmail(data.email, 'Complete Your LifeClock Journey', html)
@@ -274,6 +308,7 @@ export async function sendReactivationEmail(data: ReactivationData) {
       userName: data.userName,
       resultUrl: data.resultUrl,
       discountPercent: data.discountPercent,
+      todayCount: data.todayCount,
     })
 
     return await sendEmail(data.email, 'Last Chance: Your LifeClock Report', html)

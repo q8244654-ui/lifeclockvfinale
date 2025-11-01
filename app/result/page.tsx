@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import ChatMessage from "@/components/chat-message"
+import SocialProofCounter from "@/components/social-proof-counter"
+import GuaranteeBadge from "@/components/guarantee-badge"
+import GuaranteeSection from "@/components/guarantee-section"
+import ForceCard from "@/components/force-card"
+import RevelationCounter from "@/components/revelation-counter"
+import PreviewTeaser from "@/components/preview-teaser"
+import PermissionQuestion from "@/components/permission-question"
 import { computeLifeClockFinalReport } from "@/lib/compute-life-clock-final-report"
+import { analyzeHiddenForces } from "@/lib/analyze-forces"
+import { generateInsights } from "@/lib/generate-insights"
 import type { PhaseResult } from "@/lib/types"
 import { useAudio } from "@/hooks/use-audio"
 import { useAutoScroll } from "@/hooks/use-auto-scroll"
@@ -40,33 +49,36 @@ export default function ResultPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [showChoices, setShowChoices] = useState(false)
   const [currentStep, setCurrentStep] = useState("start")
-  const [timeLeft, setTimeLeft] = useState(15 * 60)
+  const [timeLeft, setTimeLeft] = useState(7 * 60)
   const [isTyping, setIsTyping] = useState(false)
   const [userName, setUserName] = useState("")
   const [userGender, setUserGender] = useState("")
   const [userEmail, setUserEmail] = useState("")
+  const [revealedForces, setRevealedForces] = useState<Set<string>>(new Set())
+  const [revelationCount, setRevelationCount] = useState(0)
+  const [showPreview, setShowPreview] = useState(false)
+  const [showForceQuestion, setShowForceQuestion] = useState(false)
+  const [showPermissionQuestion, setShowPermissionQuestion] = useState(false)
+  const [permissionType, setPermissionType] = useState<"revelation" | "sensitive" | "deep" | null>(null)
+  const [pendingRevelation, setPendingRevelation] = useState<(() => void) | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { playSound, playRevelation, playMotivation } = useAudio()
   const { scrollContainerRef } = useAutoScroll({ messages, isTyping })
 
   useEffect(() => {
-    const userData = getLocalStorage<any>(STORAGE_KEYS.USER)
-    const phasesResultsData = getLocalStorage<PhaseResult[]>(STORAGE_KEYS.PHASES_RESULTS)
+    const onboarding = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
+    const phasesResultsData = getLocalStorage<PhaseResult[]>(STORAGE_KEYS.PHASES_RESULTS) || 
+                              getLocalStorage<PhaseResult[]>(STORAGE_KEYS.ALL_RESULTS)
 
-    if (!userData || !phasesResultsData) {
+    if (!onboarding || !phasesResultsData) {
       router.push("/")
       return
     }
 
     try {
-      const { firstName, gender } = userData
-      setUserName(firstName || "")
-      setUserGender(gender || "")
-
-      const onboarding = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
-      if (onboarding?.email) {
-        setUserEmail(onboarding.email)
-      }
+      setUserName(onboarding.name || "")
+      setUserGender(onboarding.gender || "")
+      setUserEmail(onboarding.email || "")
 
       setPhasesResults(phasesResultsData)
 
@@ -181,107 +193,76 @@ export default function ResultPage() {
 
   const startConversation = async () => {
     const insight = getPersonalizedInsight()
+    const forces = analyzeHiddenForces(phasesResults)
+    
+    // Initialize revelation count with initial insights
+    setRevelationCount(3) // Archetype, Score, and 3 forces announcement
 
-    // MYSTERY (0-15s) - Immediate hook
+    // 1. INTRO (The silence before the revelation)
     await showTyping(getTypingDelay("action"))
-    addMessage("assistant", getTranslation('conversation.result.start.userName', 'en').replace('{userName}', userName))
-
-    await showTyping(getTypingDelay("normal"))
-    addMessage("assistant", t('conversation.result.start.stillHere', 'en') as string)
+    addMessage("assistant", "Your time has stopped. 100 questions. 100 doors opened.", "introspection")
 
     await showTyping(getTypingDelay("introspection"))
-    addMessage("assistant", t('conversation.result.start.questions', 'en') as string, "introspection")
+    addMessage("assistant", "But none of them showed the full truth. Until now.", "revelation")
 
-    await showTyping(getTypingDelay("revelation"))
-    addMessage("assistant", t('conversation.result.start.dontKnow', 'en') as string, "revelation")
-
-    // REVELATION (15-35s) - Personalized teasing
-    await showTyping(getTypingDelay("normal"))
-    addMessage("assistant", t('conversation.result.start.forExample', 'en') as string)
-
+    // 2. PHASE INTROSPECTIVE
     if (insight) {
-      await showTyping(getTypingDelay("revelation"))
-      addMessage("assistant", insight.high, "revelation")
+      await showTyping(getTypingDelay("introspection"))
+      addMessage("assistant", insight.high, "introspection")
 
       await showTyping(getTypingDelay("introspection"))
-      addMessage("assistant", t('conversation.result.start.andAlso', 'en') as string, "introspection")
-
-      await showTyping(getTypingDelay("revelation"))
-      addMessage("assistant", insight.low, "revelation")
+      addMessage("assistant", insight.low, "introspection")
     }
 
-    await showTyping(getTypingDelay("action"))
-    addMessage("assistant", t('conversation.result.start.surface', 'en') as string)
-
-    await showTyping(getTypingDelay("introspection"))
-    addMessage("assistant", t('conversation.result.start.reportContains', 'en') as string, "motivation")
-
+    // 3. ANNOUNCE REPORT
     await showTyping(getTypingDelay("normal"))
+    addMessage("assistant", "These are only fragments. Your real story begins inside your Full Report.", "motivation")
+
+    await showTyping(getTypingDelay("revelation"))
     addMessage(
       "assistant",
-      getTranslation('conversation.result.start.archetype', 'en')
-        .replace('{archetype}', getArchetypeName(finalReport.archetype))
-        .replace('{emoji}', getArchetypeEmoji(finalReport.archetype))
+      `Archetype: ${getArchetypeName(finalReport.archetype)} ${getArchetypeEmoji(finalReport.archetype)}`,
+      "revelation"
     )
 
-    await showTyping(getTypingDelay("action"))
-    addMessage("assistant", getTranslation('conversation.result.start.score', 'en').replace('{score}', finalReport.lifeIndex.lifeIndex.toString()))
-
-    // CONFRONTATION (35-55s) - Triple revelation at climax
     await showTyping(getTypingDelay("revelation"))
-    addMessage("assistant", t('conversation.result.start.mostImportantly', 'en') as string, "introspection")
-
-    await showTyping(getTypingDelay("revelation"))
-    addMessage("assistant", t('conversation.result.start.threeForces', 'en') as string, "revelation")
-
-    await showTyping(getTypingDelay("action"))
-    addMessage("assistant", t('conversation.result.start.shadow', 'en') as string)
-
-    await showTyping(getTypingDelay("action"))
-    addMessage("assistant", t('conversation.result.start.fear', 'en') as string)
-
-    await showTyping(getTypingDelay("action"))
-    addMessage("assistant", t('conversation.result.start.power', 'en') as string)
-
-    await showTyping(getTypingDelay("revelation"))
-    addMessage("assistant", t('conversation.result.start.allInReport', 'en') as string, "revelation")
-
-    // CHOICE (55-70s) - Moment of truth
-    await showTyping(getTypingDelay("introspection"))
-    addMessage("assistant", getTranslation('conversation.result.start.twoPaths', 'en').replace('{userName}', userName), "motivation")
-
-    await showTyping(getTypingDelay("normal"))
-    addMessage("assistant", t('conversation.result.start.firstPath', 'en') as string)
+    addMessage("assistant", `Score: ${finalReport.lifeIndex.lifeIndex}/100`, "revelation")
 
     await showTyping(getTypingDelay("introspection"))
-    addMessage("assistant", t('conversation.result.start.secondPath', 'en') as string, "introspection")
+    addMessage("assistant", "3 invisible forces control your life:", "introspection")
+    setRevelationCount(prev => prev + 1)
 
     await showTyping(getTypingDelay("revelation"))
-    addMessage("assistant", t('conversation.result.start.fleeOrFace', 'en') as string, "revelation")
-
-    // Show CTA at peak intensity
-    setCurrentStep("main-cta")
-    setShowChoices(true)
+    addMessage("assistant", "Click to reveal each one. They hold the keys to your transformation.", "revelation")
+    
+    // Show the force cards directly
+    setShowForceQuestion(true)
+    
+    // The flow will continue automatically when all 3 forces are revealed
+    // via the handleForceReveal function calling continueAfterForces
   }
 
   const handleMainCTA = async () => {
-    addMessage("user", t('conversation.result.mainCTA.userWants', 'en') as string)
+    addMessage("user", "I want to see everything — $47")
     setShowChoices(false)
 
     await showTyping(getTypingDelay("action"))
-    addMessage("assistant", t('conversation.result.mainCTA.goodChoice', 'en') as string, "motivation")
+    addMessage("assistant", "Good choice.", "motivation")
 
     await showTyping(getTypingDelay("normal"))
-    addMessage("assistant", t('conversation.result.mainCTA.revelations', 'en') as string)
+    addMessage("assistant", "47 personalized revelations", "normal")
+
+    await showTyping(getTypingDelay("normal"))
+    addMessage("assistant", "10 bonus ebooks", "normal")
+
+    await showTyping(getTypingDelay("normal"))
+    addMessage("assistant", "7-day challenge", "normal")
 
     await showTyping(getTypingDelay("introspection"))
-    addMessage("assistant", t('conversation.result.mainCTA.therapy', 'en') as string, "introspection")
+    addMessage("assistant", "5 years of therapy = $10,000. Your LifeClock = $47.", "introspection")
 
     await showTyping(getTypingDelay("revelation"))
-    addMessage("assistant", getTranslation('conversation.result.mainCTA.expires', 'en').replace('{time}', formatTime(timeLeft)), "revelation")
-
-    await showTyping(getTypingDelay("action"))
-    addMessage("assistant", t('conversation.result.mainCTA.ready', 'en') as string)
+    addMessage("assistant", `Offer expires in ${formatTimeDetailed(timeLeft)}.`, "revelation")
 
     // Create Stripe checkout session server-side then redirect to checkout URL
     try {
@@ -439,14 +420,175 @@ export default function ResultPage() {
     return `${minutes}:${secs.toString().padStart(2, "0")}`
   }
 
+  const formatTimeDetailed = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ${secs} ${secs === 1 ? "second" : "seconds"}`
+  }
+
   const getProgressColor = () => {
-    if (timeLeft > 600) return "bg-green-500"
-    if (timeLeft > 300) return "bg-yellow-500"
-    if (timeLeft > 120) return "bg-orange-500"
     return "bg-red-500"
   }
 
-  const progressPercentage = (timeLeft / 900) * 100
+  const progressPercentage = (timeLeft / (7 * 60)) * 100
+
+  const handleForceReveal = (forceName: string) => {
+    // Ask for permission for sensitive revelations (Shadow and Fear)
+    if ((forceName === "Shadow" || forceName === "Fear") && !revealedForces.has(forceName)) {
+      setPermissionType(forceName === "Shadow" ? "deep" : "sensitive")
+      setShowPermissionQuestion(true)
+      setPendingRevelation(() => () => {
+        revealForce(forceName)
+      })
+      return
+    }
+    
+    revealForce(forceName)
+  }
+
+  const revealForce = (forceName: string) => {
+    const newRevealed = new Set([...revealedForces, forceName])
+    setRevealedForces(newRevealed)
+    setRevelationCount(prev => prev + 1)
+    playRevelation()
+    
+    const forces = analyzeHiddenForces(phasesResults)
+    let insight = ""
+    let warning = ""
+    
+    if (forceName === "Shadow") {
+      insight = forces.shadow.insight
+      warning = "This will reveal what you hide from yourself."
+    } else if (forceName === "Fear") {
+      insight = forces.fear.insight
+      warning = "This will expose what paralyzes you."
+    } else if (forceName === "Power") {
+      insight = forces.power.insight
+    }
+    
+    if (warning) {
+      addMessage("assistant", `${forceName} — ${insight}`, "revelation")
+    } else {
+      addMessage("assistant", `${forceName} — ${insight}`, "revelation")
+    }
+    
+    // Check if all forces are revealed
+    if (newRevealed.size === 3) {
+      setTimeout(() => {
+        setShowForceQuestion(false)
+        // Continue with dilemma automatically
+        if (currentStep === "start") {
+          continueAfterForces()
+        }
+      }, 3000)
+    }
+  }
+
+  const handlePermissionGrant = () => {
+    // Ne pas cacher immédiatement - le composant gère lui-même son état visuel
+    // On cache seulement après un délai pour laisser voir l'animation
+    setTimeout(() => {
+      setShowPermissionQuestion(false)
+    }, 2000) // Cache après 2 secondes pour laisser voir l'état "granted"
+    
+    if (pendingRevelation) {
+      setTimeout(() => {
+        pendingRevelation()
+        setPendingRevelation(null)
+      }, 800) // Exécute la révélation après l'animation
+    }
+    playRevelation()
+  }
+
+  const handlePermissionDeny = () => {
+    // Dans les deux cas, on continue (grant ou deny)
+    // On cache après un délai pour voir l'animation
+    setTimeout(() => {
+      setShowPermissionQuestion(false)
+    }, 2000)
+    
+    if (pendingRevelation) {
+      setTimeout(() => {
+        pendingRevelation()
+        setPendingRevelation(null)
+      }, 800) // Exécute la révélation même si "deny"
+    }
+    playRevelation()
+  }
+
+  const continueAfterForces = async () => {
+    // 4. THE DILEMMA
+    await showTyping(getTypingDelay("introspection"))
+    addMessage("assistant", `Two paths lie before you, ${userName}.`, "motivation")
+
+    await showTyping(getTypingDelay("normal"))
+    addMessage("assistant", "The first: you forget and continue.", "normal")
+
+    await showTyping(getTypingDelay("introspection"))
+    addMessage("assistant", "The second: you see everything.", "introspection")
+
+    await showTyping(getTypingDelay("revelation"))
+    addMessage("assistant", "Do you flee, or do you face it?", "revelation")
+
+    // 5. THE OFFER
+    await showTyping(getTypingDelay("action"))
+    addMessage("assistant", "47 personalized revelations", "motivation")
+    setRevelationCount(prev => prev + 1)
+
+    await showTyping(getTypingDelay("action"))
+    addMessage("assistant", "10 bonus ebooks", "motivation")
+
+    await showTyping(getTypingDelay("action"))
+    addMessage("assistant", "7-day challenge", "motivation")
+
+    await showTyping(getTypingDelay("introspection"))
+    addMessage("assistant", "5 years of therapy = $10,000. Your LifeClock = $47.", "introspection")
+
+    await showTyping(getTypingDelay("revelation"))
+    addMessage("assistant", `Offer expires in ${formatTimeDetailed(timeLeft)}.`, "revelation")
+
+    await showTyping(getTypingDelay("action"))
+    addMessage("assistant", "187 people received their report today + 10 personalized ebooks on their report.", "motivation")
+
+    // Show preview teaser
+    setShowPreview(true)
+
+    // 6. GUARANTEE & REASSURANCE
+    await showTyping(getTypingDelay("normal"))
+    addMessage("assistant", "7d Money-Back Guarantee. If you don't feel a shift in the next 24 hours, you pay nothing.", "motivation")
+
+    await showTyping(getTypingDelay("introspection"))
+    addMessage("assistant", "You risk nothing. Except staying the same.", "introspection")
+
+    // 7. IDENTITY CLOSURE
+    await showTyping(getTypingDelay("revelation"))
+    addMessage("assistant", "The door closes soon. What you choose in the next 7 minutes decides who you become.", "revelation")
+
+    // Show CTA at peak intensity
+    setCurrentStep("main-cta")
+    setShowChoices(true)
+  }
+
+  const handleForceChoice = async (chosenForce: string) => {
+    setShowForceQuestion(false)
+    addMessage("user", `I want to know about my ${chosenForce}.`)
+    
+    await showTyping(getTypingDelay("revelation"))
+    const forces = analyzeHiddenForces(phasesResults)
+    let insight = ""
+    if (chosenForce === "Shadow") {
+      insight = forces.shadow.insight
+      handleForceReveal("Shadow")
+    } else if (chosenForce === "Fear") {
+      insight = forces.fear.insight
+      handleForceReveal("Fear")
+    } else if (chosenForce === "Power") {
+      insight = forces.power.insight
+      handleForceReveal("Power")
+    }
+    
+    setRevelationCount(prev => prev + 2)
+  }
 
   if (loading || !finalReport) {
     return (
@@ -491,6 +633,10 @@ export default function ResultPage() {
               />
             </div>
           </div>
+
+          <div className="flex-shrink-0">
+            <GuaranteeBadge />
+          </div>
         </div>
       </motion.header>
 
@@ -504,7 +650,7 @@ export default function ResultPage() {
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 relative z-10"
+        className={`flex-1 overflow-y-auto px-4 py-6 relative z-10 ${currentStep === "main-cta" ? "pb-[500px]" : ""}`}
         style={{ willChange: "transform", contain: "layout paint" }}
       >
         <div className="mx-auto max-w-md space-y-4">
@@ -517,6 +663,112 @@ export default function ResultPage() {
               delay={0}
             />
           ))}
+
+          {/* Revelation Counter */}
+          {revelationCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="sticky top-4 z-20"
+            >
+              <RevelationCounter current={revelationCount} total={47} />
+            </motion.div>
+          )}
+
+          {/* Permission Question */}
+          {showPermissionQuestion && permissionType && (
+            <PermissionQuestion
+              question={
+                permissionType === "sensitive"
+                  ? "Are you ready to see what most people refuse to acknowledge?"
+                  : permissionType === "deep"
+                  ? "This revelation goes deep into your shadows. Are you prepared?"
+                  : "Do you want to unlock this revelation?"
+              }
+              warning={
+                permissionType === "sensitive"
+                  ? "What you're about to see may challenge your self-image."
+                  : permissionType === "deep"
+                  ? "Once seen, this truth cannot be unseen."
+                  : undefined
+              }
+              onGrant={handlePermissionGrant}
+              grantLabel={
+                permissionType === "deep" ? "Yes, I'm ready" : "Show me the truth"
+              }
+              type={permissionType === "deep" ? "deep" : permissionType === "sensitive" ? "sensitive" : "revelation"}
+            />
+          )}
+
+          {/* Force Cards - Interactive Reveals - Sticky */}
+          {showForceQuestion && finalReport && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="sticky top-4 z-10 space-y-3"
+            >
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center text-gray-400 text-sm mb-4"
+              >
+                Which force intrigues you most?
+              </motion.p>
+              {(() => {
+                const forces = analyzeHiddenForces(phasesResults)
+                const forceColors = {
+                  Shadow: "#EF4444",
+                  Fear: "#EC4899",
+                  Power: "#EAB308"
+                }
+                return (
+                  <>
+                    <ForceCard
+                      name="Shadow"
+                      insight={forces.shadow.insight}
+                      revealed={revealedForces.has("Shadow")}
+                      onReveal={() => handleForceReveal("Shadow")}
+                      color={forceColors.Shadow}
+                    />
+                    <ForceCard
+                      name="Fear"
+                      insight={forces.fear.insight}
+                      revealed={revealedForces.has("Fear")}
+                      onReveal={() => handleForceReveal("Fear")}
+                      color={forceColors.Fear}
+                    />
+                    <ForceCard
+                      name="Power"
+                      insight={forces.power.insight}
+                      revealed={revealedForces.has("Power")}
+                      onReveal={() => handleForceReveal("Power")}
+                      color={forceColors.Power}
+                    />
+                  </>
+                )
+              })()}
+            </motion.div>
+          )}
+
+          {/* Preview Teaser - Stays visible once shown */}
+          {showPreview && finalReport && (() => {
+            const allRevelations = generateInsights(phasesResults, finalReport.profile)
+            const previewRevelations = allRevelations.slice(0, 3).map((r, i) => ({
+              text: r.insight,
+              index: i + 1
+            }))
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="sticky top-4 z-10"
+              >
+                <PreviewTeaser
+                  revelations={previewRevelations}
+                />
+              </motion.div>
+            )
+          })()}
 
           {isTyping && (
             <motion.div
@@ -544,50 +796,81 @@ export default function ResultPage() {
             </motion.div>
           )}
 
+          {currentStep === "main-cta" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <SocialProofCounter variant="compact" className="mt-2" />
+            </motion.div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
 
 
+      {/* Section fixe en bas - Garantie + CTA */}
+      {currentStep === "main-cta" && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="sticky bottom-0 z-30 border-t border-white/10 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-md"
+        >
+          <div className="mx-auto max-w-md">
+            <div className="px-4 pt-4">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 }}
+              >
+                <GuaranteeSection />
+              </motion.div>
+            </div>
+            {showChoices && (
+              <div className="px-4 pt-4 pb-4 flex flex-col gap-3">
+                <motion.button
+                  onClick={handleMainCTA}
+                  className="relative rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 bg-[length:200%_100%] px-6 py-4 text-center font-bold text-white shadow-lg shadow-purple-500/50 overflow-hidden"
+                  animate={{
+                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+                    boxShadow: [
+                      "0 10px 40px rgba(168, 85, 247, 0.4)",
+                      "0 10px 60px rgba(236, 72, 153, 0.6)",
+                      "0 10px 40px rgba(168, 85, 247, 0.4)",
+                    ],
+                  }}
+                  transition={{
+                    backgroundPosition: { duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" },
+                    boxShadow: { duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" },
+                  }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="relative z-10">I want to see everything — $47</span>
+                </motion.button>
+                <button
+                  onClick={handleRefuse}
+                  className="text-sm text-gray-500 hover:text-gray-400 transition-colors"
+                >
+                  {t('conversation.result.refuse.userRefuses', 'en') as string}
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       <AnimatePresence>
-        {showChoices && (
+        {showChoices && currentStep !== "main-cta" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="border-t border-white/10 bg-gradient-to-t from-black via-black/95 to-transparent p-4 pb-8"
+            className="sticky bottom-0 z-30 border-t border-white/10 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-md p-4 pb-8"
           >
             <div className="mx-auto max-w-md flex flex-col gap-3">
-              {currentStep === "main-cta" && (
-                <>
-                  <motion.button
-                    onClick={handleMainCTA}
-                    className="relative rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 bg-[length:200%_100%] px-6 py-4 text-center font-bold text-white shadow-lg shadow-purple-500/50 overflow-hidden"
-                    animate={{
-                      backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
-                      boxShadow: [
-                        "0 10px 40px rgba(168, 85, 247, 0.4)",
-                        "0 10px 60px rgba(236, 72, 153, 0.6)",
-                        "0 10px 40px rgba(168, 85, 247, 0.4)",
-                      ],
-                    }}
-                    transition={{
-                      backgroundPosition: { duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" },
-                      boxShadow: { duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" },
-                    }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className="relative z-10">🔮 {t('conversation.result.mainCTA.userWants', 'en') as string} — $47</span>
-                  </motion.button>
-                  <button
-                    onClick={handleRefuse}
-                    className="text-sm text-gray-500 hover:text-gray-400 transition-colors"
-                  >
-                    {t('conversation.result.refuse.userRefuses', 'en') as string}
-                  </button>
-                </>
-              )}
 
               {currentStep === "objection" && (
                 <>

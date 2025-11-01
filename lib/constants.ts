@@ -58,3 +58,25 @@ export const VIBRATION = {
   HEAVY: 150,
 } as const
 
+export const GUARANTEE = {
+  DAYS: 7,
+  MARKETING_TEXT: "Satisfied or refunded - 7d",
+  DESCRIPTION: "7-day money-back guarantee",
+  // Version émotionnelle pour le bloc de garantie principal
+  HOOK: "Your journey is sacred.",
+  PROMISE: "You have 7 days to explore.",
+  REFUND: "If it doesn't shift something inside you — we refund you, instantly.",
+  PROCESS: "No forms. No questions. Just honesty.",
+  SIGNATURE: "Because transformation should never feel like a risk.",
+  // Version complète (pour référence)
+  DETAILS: "7-day money-back guarantee. If you're not satisfied, get a full refund within 7 days. No questions asked.",
+  // Condition technique (pour vérification backend, pas pour affichage marketing)
+  CONDITION: "If you haven't downloaded your PDF",
+  // Texte pour CGU/Terms (non affiché dans le marketing)
+  TERMS_TEXT: "The 7-day money-back guarantee applies only if the PDF report has not been downloaded. Once the PDF is downloaded, customers retain lifetime access to their web report but refunds are no longer available.",
+} as const
+
+export const SOCIAL_PROOF = {
+  FALLBACK_COUNT: 1589, // Nombre par défaut si erreur de récupération
+} as const
+

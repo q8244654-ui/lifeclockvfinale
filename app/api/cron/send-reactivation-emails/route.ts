@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { sendReactivationEmail } from "@/lib/emails"
+import { getTodayCompletedReportsCount } from "@/lib/supabase/stats"
 
 export const dynamic = "force-dynamic"
 
@@ -17,19 +18,20 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
     const resultUrl = `${baseUrl}/result`
 
-    // Find users with quiz_complete but no payment_complete after 7 days
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const eightDaysAgo = new Date()
-    eightDaysAgo.setDate(eightDaysAgo.getDate() - 8)
+    // Find users with quiz_complete but no payment_complete after 2-3 days
+    // Faster reactivation to re-engage users before they forget
+    const twoDaysAgo = new Date()
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
 
-    // Get all quiz_complete events from 7-8 days ago
+    // Get all quiz_complete events from 2-3 days ago
     const { data: quizCompletions } = await supabase
       .from("conversions")
       .select("email, session_id, created_at")
       .eq("event_type", "quiz_complete")
-      .gte("created_at", eightDaysAgo.toISOString())
-      .lte("created_at", sevenDaysAgo.toISOString())
+      .gte("created_at", threeDaysAgo.toISOString())
+      .lte("created_at", twoDaysAgo.toISOString())
       .not("email", "is", null)
 
     if (!quizCompletions || quizCompletions.length === 0) {
@@ -56,6 +58,9 @@ export async function POST(request: Request) {
     // Remove duplicates
     const uniqueEmails = Array.from(new Set(emailsToContact))
 
+    // Get today's count for social proof (once for all emails)
+    const todayCount = await getTodayCompletedReportsCount()
+
     // Send emails with discount offer
     let sentCount = 0
     for (const email of uniqueEmails) {
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
           userName,
           resultUrl,
           discountPercent: 20, // 20% off offer
+          todayCount,
         })
         sentCount++
 

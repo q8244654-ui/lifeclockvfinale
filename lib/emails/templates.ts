@@ -135,9 +135,19 @@ export function getPaymentConfirmationTemplate(data: {
       <li>Your 3 Hidden Forces (Shadow, Fear, Power)</li>
       <li>Complete phase analysis</li>
       <li>Your life curve visualization</li>
+      <li>10 free personalized ebooks (one per phase)</li>
     </ul>
     ${data.reportUrl ? `<p><a href="${data.reportUrl}" class="button">View Report Online</a></p>` : ''}
     <p>Take your time to explore these insights. They reveal patterns that have shaped your journey.</p>
+    
+    <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 20px; margin: 30px 0;">
+      <h3 style="color: #22C55E; font-size: 18px; font-weight: bold; margin-bottom: 10px;">Satisfait ou remboursé - 7 jours</h3>
+      <p style="color: #D1D5DB; margin-bottom: 10px;">Not satisfied? Get a full refund within 7 days.</p>
+      <p style="color: #D1D5DB; margin-bottom: 5px;">No questions asked.</p>
+      <p style="color: #D1D5DB; margin-bottom: 15px;">To request a refund, simply reply to this email within 7 days.</p>
+      <p style="font-size: 12px; color: #6B7280; margin: 0;">Terms and conditions apply. See refund policy for details.</p>
+    </div>
+    
     <p style="margin-top: 30px; font-style: italic; color: #9CA3AF;">
       "Time is no longer counted. It belongs to you."
     </p>
@@ -148,13 +158,29 @@ export function getPaymentConfirmationTemplate(data: {
 export function getAbandonedCartTemplate(data: {
   userName: string
   resultUrl: string
+  todayCount?: number
 }): string {
+  const count = data.todayCount ?? 1589
+  const formattedCount = count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+  
   const content = `
+    <p style="font-size: 20px; font-weight: bold; color: #F3F4F6; margin-bottom: 20px;">Your report is still waiting...</p>
     <p>You started something powerful, but didn't finish it.</p>
     <p>Your LifeClock report is waiting. <span class="highlight">47 revelations</span> that will change how you see yourself.</p>
     <p>You've already invested 20 minutes. Don't let that moment slip away.</p>
-    <p><a href="${data.resultUrl}" class="button">Complete Your Purchase</a></p>
-    <p style="font-size: 14px; color: #9CA3AF;">This offer expires soon. Don't miss your chance to discover what your answers reveal.</p>
+    
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+      <p style="color: #60A5FA; font-size: 14px; margin: 0;"><strong>${formattedCount}</strong> personnes ont reçu aujourd'hui leur rapport + 10 ebooks personnalisés</p>
+    </div>
+    
+    <p><a href="${data.resultUrl}" class="button" style="font-size: 16px; padding: 16px 32px;">Complete Your Purchase</a></p>
+    
+    <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 15px; margin: 20px 0;">
+      <p style="color: #22C55E; font-weight: 600; margin-bottom: 5px;">Satisfait ou remboursé - 7 jours</p>
+      <p style="color: #D1D5DB; font-size: 14px; margin: 0;">Not satisfied? Full refund within 7 days. No questions asked.</p>
+    </div>
+    
+    <p style="font-size: 14px; color: #FBBF24; font-weight: 600;">⏳ This offer expires soon. Don't miss your chance to discover what your answers reveal.</p>
   `
   return getBaseEmailTemplate(content, data.userName)
 }
@@ -177,7 +203,11 @@ export function getReferralCommissionTemplate(data: {
 export function getWelcomeEmailTemplate(data: {
   userName: string
   quizUrl: string
+  todayCount?: number
 }): string {
+  const count = data.todayCount ?? 1589
+  const formattedCount = count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+  
   const content = `
     <p>Welcome to LifeClock, ${data.userName}.</p>
     <p>You're about to embark on a journey of self-discovery. Through <span class="highlight">100 carefully crafted questions</span>, you'll uncover patterns that have shaped your life.</p>
@@ -187,7 +217,13 @@ export function getWelcomeEmailTemplate(data: {
       <li>Your archetype and dominant energy</li>
       <li>47 personalized revelations</li>
       <li>Your 3 Hidden Forces</li>
+      <li>10 free personalized ebooks (one per phase)</li>
     </ul>
+    
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+      <p style="color: #60A5FA; font-size: 14px; margin: 0;"><strong>${formattedCount}</strong> personnes ont fait le voyage aujourd'hui</p>
+    </div>
+    
     <p><a href="${data.quizUrl}" class="button">Start Your Journey</a></p>
     <p style="color: #9CA3AF;">Take your time. Be honest. These questions are mirrors.</p>
   `
@@ -218,6 +254,12 @@ export function getCheckoutCancelledTemplate(data: {
     <p>Your LifeClock report contains insights that could change everything. <span class="highlight">47 revelations</span> about who you are, hidden in your answers.</p>
     <p>You've come this far. Don't turn back now.</p>
     <p><a href="${data.resultUrl}" class="button">Complete Your Purchase</a></p>
+    
+    <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 15px; margin: 20px 0;">
+      <p style="color: #22C55E; font-weight: 600; margin-bottom: 5px;">Try risk-free with our 7-day money-back guarantee</p>
+      <p style="color: #D1D5DB; font-size: 14px; margin: 0;">Satisfied or refunded within 7 days.</p>
+    </div>
+    
     <p style="color: #9CA3AF; font-size: 14px;">Remember: this isn't just a PDF. It's a mirror.</p>
   `
   return getBaseEmailTemplate(content, data.userName)
@@ -240,12 +282,23 @@ export function getCommissionPaidTemplate(data: {
 export function getQuizAbandonmentTemplate(data: {
   userName: string
   quizUrl: string
+  todayCount?: number
 }): string {
+  const count = data.todayCount ?? 1589
+  const formattedCount = count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+  
   const content = `
+    <p style="font-size: 20px; font-weight: bold; color: #F3F4F6; margin-bottom: 20px;">You started something powerful...</p>
     <p>You started your LifeClock journey but didn't complete it.</p>
     <p>Those <span class="highlight">100 questions</span> you began are waiting. Each one is a door to understanding yourself better.</p>
+    <p><strong>100 questions = 47 revelations</strong> that will change how you see yourself.</p>
     <p>Don't let this moment pass. Your answers will reveal patterns that have been invisible until now.</p>
-    <p><a href="${data.quizUrl}" class="button">Continue Your Journey</a></p>
+    
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+      <p style="color: #60A5FA; font-size: 14px; margin: 0;"><strong>${formattedCount}</strong> personnes ont complété leur quiz aujourd'hui</p>
+    </div>
+    
+    <p><a href="${data.quizUrl}" class="button" style="font-size: 16px; padding: 16px 32px;">Continue Your Journey</a></p>
     <p style="color: #9CA3AF;">It takes about 20 minutes. But what you'll discover lasts a lifetime.</p>
   `
   return getBaseEmailTemplate(content, data.userName)
@@ -284,17 +337,33 @@ export function getReactivationTemplate(data: {
   userName: string
   resultUrl: string
   discountPercent?: number
+  todayCount?: number
 }): string {
   const discountText = data.discountPercent 
     ? `<p style="font-size: 18px; font-weight: bold; color: #FBBF24;">Special Offer: ${data.discountPercent}% OFF</p>`
     : ''
+  const count = data.todayCount ?? 1589
+  const formattedCount = count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+  
   const content = `
     <p>This is your last chance, ${data.userName}.</p>
     <p>Your LifeClock report has been waiting. Those <span class="highlight">47 revelations</span> are yours to discover.</p>
     ${discountText}
     <p>You've seen the surface. Now see everything.</p>
+    
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center;">
+      <p style="color: #60A5FA; font-size: 14px; margin: 0;"><strong>${formattedCount}</strong> personnes ont reçu aujourd'hui leur rapport</p>
+    </div>
+    
     <p><a href="${data.resultUrl}" class="button">Claim Your Report Now</a></p>
+    
+    <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 15px; margin: 20px 0;">
+      <p style="color: #22C55E; font-weight: 600; margin-bottom: 5px;">Risk-free: Satisfait ou remboursé - 7 jours</p>
+      <p style="color: #D1D5DB; font-size: 14px; margin: 0;">Full refund within 7 days if not satisfied.</p>
+    </div>
+    
     <p style="color: #9CA3AF; font-size: 14px;">This offer won't last. Don't let it slip away.</p>
+    <p style="color: #EF4444; font-weight: 600; font-size: 14px;">This is your last chance to see your 47 revelations.</p>
   `
   return getBaseEmailTemplate(content, data.userName)
 }

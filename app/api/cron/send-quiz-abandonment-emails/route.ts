@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { sendQuizAbandonmentEmail } from "@/lib/emails"
+import { getTodayCompletedReportsCount } from "@/lib/supabase/stats"
 
 export const dynamic = "force-dynamic"
 
@@ -17,19 +18,20 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
     const quizUrl = `${baseUrl}/quiz`
 
-    // Find users with email_given but no quiz_complete in last 48-72 hours
-    const twoDaysAgo = new Date()
-    twoDaysAgo.setHours(twoDaysAgo.getHours() - 48)
-    const threeDaysAgo = new Date()
-    threeDaysAgo.setHours(threeDaysAgo.getHours() - 72)
+    // Find users with email_given but no quiz_complete in last 30min-1h
+    // Ultra-fast timing to catch users while engagement is highest
+    const thirtyMinutesAgo = new Date()
+    thirtyMinutesAgo.setMinutes(thirtyMinutesAgo.getMinutes() - 30)
+    const oneHourAgo = new Date()
+    oneHourAgo.setHours(oneHourAgo.getHours() - 1)
 
-    // Get all email_given events from last 72 hours
+    // Get all email_given events from last 1 hour
     const { data: emailGivenEvents } = await supabase
       .from("conversions")
       .select("email, session_id, created_at")
       .eq("event_type", "email_given")
-      .gte("created_at", threeDaysAgo.toISOString())
-      .lte("created_at", twoDaysAgo.toISOString())
+      .gte("created_at", oneHourAgo.toISOString())
+      .lte("created_at", thirtyMinutesAgo.toISOString())
       .not("email", "is", null)
 
     if (!emailGivenEvents || emailGivenEvents.length === 0) {
@@ -56,6 +58,9 @@ export async function POST(request: Request) {
     // Remove duplicates
     const uniqueEmails = Array.from(new Set(emailsToContact))
 
+    // Get today's count for social proof (once for all emails)
+    const todayCount = await getTodayCompletedReportsCount()
+
     // Send emails
     let sentCount = 0
     for (const email of uniqueEmails) {
@@ -72,6 +77,7 @@ export async function POST(request: Request) {
           email,
           userName,
           quizUrl,
+          todayCount,
         })
         sentCount++
 

@@ -15,6 +15,7 @@ import { useAutoScroll } from "@/hooks/use-auto-scroll"
 import { getLocalStorage, setLocalStorage } from "@/hooks/use-local-storage"
 import { STORAGE_KEYS, TIMING, SOUNDS } from "@/lib/constants"
 import { buttonClasses } from "@/lib/style-system"
+import { getMotivationMessage, getTopPercentageMessage } from "@/lib/phase-top-messages"
 
 interface Message {
   role: "assistant" | "user"
@@ -52,6 +53,8 @@ export default function QuizPage() {
   const [showPhaseTransition, setShowPhaseTransition] = useState(false)
   const [transitionPhase, setTransitionPhase] = useState<(typeof phaseTransitions)[0] | null>(null)
   const [userName, setUserName] = useState<string>("")
+  const phaseStartedRef = useRef<boolean>(false)
+  const lastAskedQuestionRef = useRef<string>("") // Track la dernière question posée pour éviter les doublons
 
   const { playPop, playSend, playChime, playComplete } = useAudio()
   const { scrollContainerRef } = useAutoScroll({ messages, isTyping })
@@ -62,27 +65,49 @@ export default function QuizPage() {
   const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      startPhase()
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
     const onboardingData = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
     if (onboardingData) {
       setUserName(onboardingData.name || "")
     }
   }, [])
 
-  const startPhase = async () => {
+  useEffect(() => {
+    // S'assurer que userName est chargé avant de démarrer la phase
+    // et éviter les appels multiples (React Strict Mode)
+    if (phaseStartedRef.current) return
+    
+    const onboardingData = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
+    const name = onboardingData?.name || ""
+    
+    // S'assurer que userName est défini avant de démarrer
+    const timer = setTimeout(() => {
+      if (!phaseStartedRef.current) {
+        phaseStartedRef.current = true
+        // Utiliser directement la valeur du localStorage pour éviter les problèmes de timing
+        startPhase(name)
+      }
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const startPhase = async (initialUserName?: string, phaseIndexOverride?: number) => {
+    // Utiliser le paramètre ou fallback sur userName du state
+    const nameToUse = initialUserName !== undefined ? initialUserName : userName
+    if (initialUserName && initialUserName !== userName) {
+      setUserName(initialUserName)
+    }
+    
+    // Utiliser l'index de phase passé en paramètre ou l'index actuel
+    const phaseIndex = phaseIndexOverride !== undefined ? phaseIndexOverride : currentPhaseIndex
+    const phase = phases[phaseIndex]
+    
     setIsTyping(true)
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
     setMessages([
       {
         role: "assistant",
-        text: currentPhase.intro,
+        text: phase.intro,
         messageType: "revelation",
       },
     ])
@@ -90,20 +115,102 @@ export default function QuizPage() {
     playPop()
 
     await new Promise((resolve) => setTimeout(resolve, 2500))
-    askQuestion()
+    askQuestion(nameToUse)
   }
 
-  const askQuestion = () => {
+  const askQuestion = (userNameOverride?: string) => {
     setIsTyping(true)
     setCanAnswer(false)
     setShowOptions(false)
 
+    // Capturer les valeurs nécessaires au moment de l'appel
+    const phaseIndex = currentPhaseIndex
+    const questionIndex = currentQuestionIndex
+    const questionText = phases[phaseIndex].questions[questionIndex].text
+    
+    // Utiliser le paramètre en priorité, sinon userName du state, sinon lire directement depuis localStorage
+    let currentUserName: string = userNameOverride || userName || ""
+    if (!currentUserName) {
+      const onboardingData = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
+      currentUserName = onboardingData?.name || ""
+    }
+    
+    // Créer un identifiant unique pour cette question
+    const questionId = `${phaseIndex}-${questionIndex}-${questionText.replace(/\{name\}/g, "").trim()}`
+    const questionTextWithName = questionText.replace(/\{name\}/g, currentUserName)
+
     setTimeout(() => {
+      // Vérifier si cette question a déjà été posée en utilisant la ref
+      if (lastAskedQuestionRef.current === questionId) {
+        // Cette question a déjà été posée, vérifier si elle existe vraiment dans les messages
+        // et si le nom est correct
+        setMessages((prev) => {
+          // Trouver le message de question correspondant
+          const questionMessages = prev.filter(m => m.role === "assistant")
+          // Prendre le dernier message qui pourrait être cette question
+          // (on cherche le message assistant juste avant le dernier message user ou feedback)
+          let foundQuestion: Message | null = null
+          for (let i = questionMessages.length - 1; i >= 0; i--) {
+            const msg = questionMessages[i]
+            const normalizedMsg = msg.text.replace(/\{name\}/g, "").trim()
+            const normalizedQuestion = questionText.replace(/\{name\}/g, "").trim()
+            if (normalizedMsg === normalizedQuestion) {
+              foundQuestion = msg
+              break
+            }
+          }
+
+          if (foundQuestion) {
+            // La question existe déjà
+            if (foundQuestion.text === questionTextWithName) {
+              // Déjà affichée avec le bon nom, ne rien changer
+              setIsTyping(false)
+              setTimeout(() => {
+                setShowOptions(true)
+                setCanAnswer(true)
+              }, 100)
+              return prev
+            } else {
+              // Le nom est différent, mettre à jour
+              return prev.map((msg) => {
+                if (msg === foundQuestion) {
+                  return {
+                    ...msg,
+                    text: questionTextWithName,
+                  }
+                }
+                return msg
+              })
+            }
+          }
+          
+          // La question n'existe pas dans les messages malgré la ref, l'ajouter
+          return [
+            ...prev,
+            {
+              role: "assistant",
+              text: questionTextWithName,
+            },
+          ]
+        })
+        
+        setIsTyping(false)
+        playPop()
+        setTimeout(() => {
+          setShowOptions(true)
+          setCanAnswer(true)
+        }, 800)
+        return
+      }
+      
+      // Cette question n'a jamais été posée, l'ajouter
+      lastAskedQuestionRef.current = questionId
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          text: replaceVariables(currentQuestion.text),
+          text: questionTextWithName,
         },
       ])
       setIsTyping(false)
@@ -167,10 +274,64 @@ export default function QuizPage() {
         )
       }, 1500)
 
+      // Check if we should show top percentage message (every 3 answers)
+      // or motivation message (every 4 answers)
+      const totalAnswers = answers.length + 1
+      const shouldShowTopPercentage = totalAnswers > 0 && totalAnswers % 3 === 0
+      const shouldShowMotivation = totalAnswers > 0 && totalAnswers % 4 === 0
+
       const nextQuestionIndex = currentQuestionIndex + 1
 
-      if (nextQuestionIndex < totalQuestions) {
+      // Show top percentage message every 3 answers
+      if (shouldShowTopPercentage && nextQuestionIndex < totalQuestions) {
+        setTimeout(() => {
+          setIsTyping(true)
+          setTimeout(() => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                text: getTopPercentageMessage(),
+                messageType: "motivation",
+              },
+            ])
+            setIsTyping(false)
+            playPop()
+
+            setTimeout(() => {
+              setCurrentQuestionIndex(nextQuestionIndex)
+              lastAskedQuestionRef.current = "" // Réinitialiser pour la prochaine question
+              askQuestion()
+            }, 2000)
+          }, 1500)
+        }, 2000)
+      }
+      // Show motivation message every 4 answers (separate from top percentage)
+      else if (shouldShowMotivation && nextQuestionIndex < totalQuestions) {
+        setTimeout(() => {
+          setIsTyping(true)
+          setTimeout(() => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                text: getMotivationMessage(),
+                messageType: "motivation",
+              },
+            ])
+            setIsTyping(false)
+            playPop()
+
+            setTimeout(() => {
+              setCurrentQuestionIndex(nextQuestionIndex)
+              lastAskedQuestionRef.current = "" // Réinitialiser pour la prochaine question
+              askQuestion()
+            }, 2000)
+          }, 1500)
+        }, 2000)
+      } else if (nextQuestionIndex < totalQuestions) {
         setCurrentQuestionIndex(nextQuestionIndex)
+        lastAskedQuestionRef.current = "" // Réinitialiser pour la prochaine question
         setTimeout(() => {
           askQuestion()
         }, 2000)
@@ -256,7 +417,8 @@ export default function QuizPage() {
       setTransitionPhase(phaseTransitions[nextPhaseIndex])
       setShowPhaseTransition(true)
     } else {
-      setLocalStorage(STORAGE_KEYS.ALL_RESULTS, updatedResults)
+      setLocalStorage(STORAGE_KEYS.PHASES_RESULTS, updatedResults)
+      setLocalStorage(STORAGE_KEYS.ALL_RESULTS, updatedResults) // Keep for backward compatibility
       // Track quiz completion once per session before redirect
       ;(async () => {
         try {
@@ -272,13 +434,16 @@ export default function QuizPage() {
 
   const handleTransitionComplete = () => {
     setShowPhaseTransition(false)
-    setCurrentPhaseIndex(currentPhaseIndex + 1)
+    const nextPhaseIndex = currentPhaseIndex + 1
+    setCurrentPhaseIndex(nextPhaseIndex)
     setCurrentQuestionIndex(0)
     setAnswers([])
     setMessages([])
+    lastAskedQuestionRef.current = "" // Réinitialiser pour la nouvelle phase
 
     setTimeout(() => {
-      startPhase()
+      // Passer le nouvel index de phase pour éviter les problèmes de closure
+      startPhase(undefined, nextPhaseIndex)
     }, 500)
   }
 
@@ -319,7 +484,7 @@ export default function QuizPage() {
         className="hide-scrollbar flex-1 overflow-y-auto p-4"
         style={{ willChange: "transform", contain: "layout paint" }}
       >
-        <div className="mx-auto flex max-w-md flex-col space-y-1.5 pb-[400px]">
+        <div className="mx-auto flex max-w-md flex-col space-y-1.5 pb-[432px]">
           {messages.map((message, index) => (
             <ChatMessage
               key={index}

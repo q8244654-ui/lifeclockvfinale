@@ -243,7 +243,7 @@ export default function ResultPage() {
   }
 
   const handleMainCTA = async () => {
-    addMessage("user", "I want to see everything — $47")
+    addMessage("user", "I'm ready to see who I really am — $47")
     setShowChoices(false)
 
     await showTyping(getTypingDelay("action"))
@@ -832,13 +832,13 @@ export default function ResultPage() {
               <div className="px-4 pt-4 pb-4 flex flex-col gap-3">
                 <motion.button
                   onClick={handleMainCTA}
-                  className="relative rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 bg-[length:200%_100%] px-6 py-4 text-center font-bold text-white shadow-lg shadow-purple-500/50 overflow-hidden"
+                  className="relative rounded-2xl bg-gradient-to-r from-red-500 via-red-600 to-red-500 bg-[length:200%_100%] px-6 py-4 text-center font-bold text-white shadow-lg shadow-red-500/50 overflow-hidden"
                   animate={{
                     backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
                     boxShadow: [
-                      "0 10px 40px rgba(168, 85, 247, 0.4)",
-                      "0 10px 60px rgba(236, 72, 153, 0.6)",
-                      "0 10px 40px rgba(168, 85, 247, 0.4)",
+                      "0 10px 40px rgba(239, 68, 68, 0.4)",
+                      "0 10px 60px rgba(220, 38, 38, 0.6)",
+                      "0 10px 40px rgba(239, 68, 68, 0.4)",
                     ],
                   }}
                   transition={{
@@ -848,8 +848,11 @@ export default function ResultPage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <span className="relative z-10">I want to see everything — $47</span>
+                  <span className="relative z-10">I'm ready to see who I really am — $47</span>
                 </motion.button>
+                <p className="text-xs text-gray-400 text-center">
+                  + 10 personalized ebooks revealed after purchase (value $200)
+                </p>
                 <button
                   onClick={handleRefuse}
                   className="text-sm text-gray-500 hover:text-gray-400 transition-colors"

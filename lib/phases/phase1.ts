@@ -67,7 +67,7 @@ export const phase1 = {
         },
         {
           label: "😏 You analyze who stands out the most.",
-          value: 1,
+          value: 2,
           feedback: "Your gaze seeks social reference points.",
         },
         { label: "😃 You start conversations naturally.", value: 3, feedback: "You no longer need a mask to exist." },

@@ -14,9 +14,9 @@ export default function GuaranteeSection() {
       animate={{ opacity: 1, y: 0 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="relative rounded-xl border border-amber-500/20 p-6 backdrop-blur-sm space-y-5 overflow-hidden"
+      className="relative rounded-lg border border-green-500/20 p-4 backdrop-blur-sm overflow-hidden"
       style={{
-        background: "linear-gradient(to bottom right, rgba(245, 158, 11, 0.1), rgba(234, 179, 8, 0.1), rgba(245, 158, 11, 0.1))",
+        background: "linear-gradient(to bottom right, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.1), rgba(34, 197, 94, 0.1))",
       }}
     >
       {/* Halo lumineux animé au survol */}
@@ -28,60 +28,57 @@ export default function GuaranteeSection() {
         transition={{ duration: 0.4, ease: "easeOut" }}
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(circle at center, rgba(251, 191, 36, 0.2) 0%, transparent 70%)",
+          background: "radial-gradient(circle at center, rgba(74, 222, 128, 0.2) 0%, transparent 70%)",
         }}
       />
 
       {/* Contenu */}
-      <div className="relative z-10 space-y-5">
-        {/* Icône et titre */}
-        <div className="flex items-start gap-4">
+      <div className="relative z-10 space-y-2.5">
+        {/* Titre et icône compacts */}
+        <div className="flex items-center gap-2.5">
           <motion.div
             animate={{
               scale: isHovered ? 1.05 : 1,
             }}
             transition={{ duration: 0.3 }}
-            className="w-14 h-14 rounded-full flex items-center justify-center border border-amber-500/30 shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center border border-green-500/30 shrink-0"
             style={{
-              background: "linear-gradient(to bottom right, rgba(245, 158, 11, 0.2), rgba(234, 179, 8, 0.2))",
+              background: "linear-gradient(to bottom right, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.2))",
             }}
           >
-            <Clock className="w-7 h-7 text-amber-400" />
+            <Clock className="w-4 h-4 text-green-400" />
           </motion.div>
-          <div className="flex-1 pt-1">
-            <h3 className="text-lg font-bold text-white mb-1">{GUARANTEE.MARKETING_TEXT}</h3>
-          </div>
+          <h3 className="text-sm font-bold text-white">{GUARANTEE.MARKETING_TEXT}</h3>
         </div>
 
         {/* Hook émotionnel */}
-        <p className="text-lg font-medium text-white/95 leading-relaxed">
+        <p className="text-sm font-medium text-white/95 leading-snug">
           {GUARANTEE.HOOK}
         </p>
 
-        {/* Promesse */}
-        <p className="text-gray-200 leading-relaxed">
-          {GUARANTEE.PROMISE}
-        </p>
-
-        {/* Garantie de remboursement */}
-        <p className="text-gray-300 leading-relaxed">
-          {GUARANTEE.REFUND}
-        </p>
-
-        {/* Process simplifié */}
-        <div className="space-y-1 pt-1">
-          <p className="text-sm text-gray-300/90 font-medium">
-            {GUARANTEE.PROCESS}
+        {/* Promesse et remboursement compacts */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-gray-200 leading-snug">
+            {GUARANTEE.PROMISE}
+          </p>
+          <p className="text-xs text-gray-300 leading-snug">
+            {GUARANTEE.REFUND}
           </p>
         </div>
 
-        {/* Signature émotionnelle */}
-        <p className="text-amber-300/90 italic pt-2 border-t border-amber-500/20">
-          {GUARANTEE.SIGNATURE}
-        </p>
+        {/* Process et signature sur une ligne */}
+        <div className="flex items-center gap-2 pt-1 border-t border-green-500/20">
+          <p className="text-xs text-gray-300/90 font-medium shrink-0">
+            {GUARANTEE.PROCESS}
+          </p>
+          <span className="text-green-500/50">•</span>
+          <p className="text-xs text-green-300/80 italic flex-1">
+            {GUARANTEE.SIGNATURE}
+          </p>
+        </div>
 
         {/* Note légale discrète */}
-        <p className="text-xs text-gray-500 pt-1">
+        <p className="text-[10px] text-gray-500/80 leading-tight pt-0.5">
           Terms apply. See refund policy for details.
         </p>
       </div>

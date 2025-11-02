@@ -47,9 +47,11 @@ export default function SocialProofCounter({ variant = "full", className = "" }:
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: loading ? 0.5 : 1, y: 0 }}
-        className={`text-sm text-gray-400 ${className}`}
+        className={`rounded-lg bg-white/10 border border-white/20 px-4 py-3 backdrop-blur-sm ${className}`}
       >
-        {text}
+        <p className="text-sm text-white/90 text-center leading-relaxed font-medium">
+          {text}
+        </p>
       </motion.div>
     )
   }

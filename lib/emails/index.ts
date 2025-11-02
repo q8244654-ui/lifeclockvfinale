@@ -67,7 +67,7 @@ async function sendEmail(to: string, subject: string, html: string, attachments?
       })),
     })
 
-    if (result.error) {
+    if ('error' in result && result.error) {
       const errorMessage = typeof result.error === 'object' 
         ? JSON.stringify(result.error, null, 2)
         : String(result.error)
@@ -80,7 +80,7 @@ async function sendEmail(to: string, subject: string, html: string, attachments?
       return { success: false, error: errorMessage }
     }
 
-    if (result.data?.id) {
+    if ('data' in result && result.data?.id) {
       console.log(`[Email] Successfully sent email to ${to} - ID: ${result.data.id}`)
       return { success: true, id: result.data.id }
     } else {

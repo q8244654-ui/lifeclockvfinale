@@ -232,3 +232,40 @@ body {
 .quiz-phase-title {
   color: var(--phase-color);
 }
+
+/* Glassmorphism utility classes */
+.glass-card {
+  background: linear-gradient(135deg, rgba(10, 10, 10, 0.8) 0%, rgba(10, 10, 10, 0.4) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.glass-card-gold {
+  background: linear-gradient(135deg, rgba(229, 201, 126, 0.15) 0%, rgba(10, 10, 10, 0.8) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(229, 201, 126, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 40px rgba(229, 201, 126, 0.2);
+}
+
+.glass-sphere {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: radial-gradient(circle, rgba(20, 20, 20, 0.6) 0%, transparent 70%);
+}
+
+/* Soft shadow utilities */
+.shadow-soft-gold {
+  box-shadow: 0 8px 32px rgba(229, 201, 126, 0.4), 0 0 60px rgba(229, 201, 126, 0.2);
+}
+
+.shadow-soft-amethyst {
+  box-shadow: 0 8px 32px rgba(143, 115, 255, 0.4), 0 0 60px rgba(143, 115, 255, 0.2);
+}
+
+.shadow-soft-dark {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}

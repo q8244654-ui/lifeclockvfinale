@@ -98,7 +98,8 @@ export default function GeneratingPage() {
         setCurrentMessage(message)
       }
 
-      if (newProgress >= 100) {
+      // Redirection lorsque le compteur atteint 0 ou la progression atteint 100%
+      if (newProgress >= 100 || remaining <= 0 || elapsed >= totalDuration) {
         clearInterval(interval)
         setTimeout(() => {
           router.push("/result")

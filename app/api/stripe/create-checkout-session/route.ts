@@ -18,13 +18,18 @@ const stripe = new Stripe(stripeSecretKey, {
 
 export async function POST(request: Request) {
   try {
+    console.log("[Stripe API] Request received")
     const body = await request.json()
+    console.log("[Stripe API] Body parsed:", { email: body.email, hasReferralCode: !!body.referralCode })
+    
     const { referralCode, email, firstName, lastName } = createCheckoutSessionSchema.parse(body)
 
     const origin = request.headers.get("origin") || ""
     const referer = request.headers.get("referer") || ""
     
-    // Extract base URL from referer if origin is not available
+    console.log("[Stripe API] Headers:", { origin, referer })
+    
+    // Extract base URL from origin or referer if available
     let baseUrl = origin
     if (!baseUrl && referer) {
       try {
@@ -35,7 +40,17 @@ export async function POST(request: Request) {
       }
     }
     
-    baseUrl = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+    // Fallback to environment variable or localhost
+    if (!baseUrl) {
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+    }
+    
+    // Ensure HTTPS in production (except localhost)
+    if (baseUrl.includes("lifeclock.quest") && !baseUrl.startsWith("https://")) {
+      baseUrl = baseUrl.replace("http://", "https://")
+    }
+
+    console.log("[Stripe API] Creating session with baseUrl:", baseUrl)
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -45,9 +60,12 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/report`,
+      success_url: `${baseUrl}/books`,
       cancel_url: `${baseUrl}/result`,
-      customer_email: email || undefined,
+      // Set checkout page language to English
+      locale: "en",
+      // Don't pre-fill email - let customer enter it themselves in checkout
+      // customer_email: email || undefined,
       // Apple Pay and Google Pay are automatically enabled when payment_method_types includes "card"
       // They will appear as payment options if enabled in Stripe Dashboard and supported by the device
       payment_method_types: ["card"],
@@ -55,6 +73,10 @@ export async function POST(request: Request) {
         card: {
           request_three_d_secure: "automatic",
         },
+      },
+      // Enable automatic tax calculation (requires Stripe Tax to be enabled in dashboard)
+      automatic_tax: {
+        enabled: true,
       },
       payment_intent_data: {
         metadata: {
@@ -68,9 +90,24 @@ export async function POST(request: Request) {
       },
     })
 
+    console.log("[Stripe API] Session created successfully, URL:", session.url)
     return NextResponse.json({ url: session.url })
-  } catch {
-    return NextResponse.json({ error: "Unable to create checkout session" }, { status: 500 })
+  } catch (error) {
+    console.error("[Stripe] Error creating checkout session:", error)
+    
+    let errorMessage = "Unable to create checkout session"
+    if (error instanceof Error) {
+      // Don't expose sensitive API key information to client
+      if (error.message.includes("API Key")) {
+        errorMessage = "Stripe API configuration error. Please check your API keys."
+      } else if (error.message.includes("Expired")) {
+        errorMessage = "Stripe API key is expired. Please update your STRIPE_SECRET_KEY environment variable."
+      } else {
+        errorMessage = error.message
+      }
+    }
+    
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 

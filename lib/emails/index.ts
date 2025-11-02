@@ -28,7 +28,7 @@ import {
   getAdminNewPaymentTemplate,
   getAdminMilestoneTemplate,
 } from './templates'
-import { generateReportPDF } from './pdf-generator'
+// PDF generator is imported dynamically to avoid Next.js client-side bundling issues
 
 const resendApiKey = process.env.RESEND_API_KEY
 const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@lifeclock.quest'
@@ -67,15 +67,17 @@ async function sendEmail(to: string, subject: string, html: string, attachments?
       })),
     })
 
-    if ('error' in result && result.error) {
-      const errorMessage = typeof result.error === 'object' 
-        ? JSON.stringify(result.error, null, 2)
-        : String(result.error)
+    // Type guard pour vérifier si result contient une erreur
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      const error = result.error
+      const errorMessage = typeof error === 'object' 
+        ? JSON.stringify(error, null, 2)
+        : String(error)
       console.error('[Email] Error sending email:', {
         to,
         subject,
         error: errorMessage,
-        fullError: result.error,
+        fullError: error,
       })
       return { success: false, error: errorMessage }
     }
@@ -105,9 +107,12 @@ export async function sendPaymentConfirmationEmail(data: PaymentConfirmationData
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     const reportUrl = data.reportUrl || `${baseUrl}/report`
+    const booksUrl = data.booksUrl || `${baseUrl}/books`
 
     let pdfBuffer: Buffer | null = null
     try {
+      // Dynamic import to avoid Next.js client-side bundling
+      const { generateReportPDF } = await import('./pdf-generator')
       pdfBuffer = await generateReportPDF(data.reportData, data.forces, data.revelations, data.userName)
     } catch (error) {
       console.error('[Email] Error generating PDF:', error)
@@ -117,6 +122,7 @@ export async function sendPaymentConfirmationEmail(data: PaymentConfirmationData
     const html = getPaymentConfirmationTemplate({
       userName: data.userName,
       reportUrl,
+      booksUrl,
     })
 
     const attachments = pdfBuffer

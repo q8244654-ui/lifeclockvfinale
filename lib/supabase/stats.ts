@@ -42,7 +42,7 @@ export async function getTodayCompletedReportsCount(): Promise<number> {
 
     // Mettre à jour le cache
     cachedCount = countValue
-    cacheTimestamp = now
+    cacheTimestamp = now.getTime()
 
     return countValue
   } catch (error) {

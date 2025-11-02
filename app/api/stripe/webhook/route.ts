@@ -130,6 +130,7 @@ export async function POST(request: Request) {
             const reportUrl = reportData.unique_link
               ? `${baseUrl}/report?link=${reportData.unique_link}`
               : `${baseUrl}/report`
+            const booksUrl = `${baseUrl}/books`
 
             const emailResult = await sendPaymentConfirmationEmail({
               email: referredEmail,
@@ -138,6 +139,7 @@ export async function POST(request: Request) {
               forces: forces || {},
               revelations: revelations || [],
               reportUrl,
+              booksUrl,
             })
             
             if (!emailResult.success) {

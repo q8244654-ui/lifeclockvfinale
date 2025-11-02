@@ -16,6 +16,7 @@ export interface PaymentConfirmationData {
   forces: any
   revelations: any[]
   reportUrl?: string
+  booksUrl?: string
 }
 
 export interface AbandonedCartData {

@@ -35,6 +35,11 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
+  // Exclude @react-pdf/renderer from server components
+  // It needs to run in Node.js environment, not in Edge runtime
+  serverExternalPackages: ['@react-pdf/renderer'],
+  // Turbopack config - empty to use defaults (Turbopack is default in Next.js 16)
+  turbopack: {},
   async headers() {
     return [
       {

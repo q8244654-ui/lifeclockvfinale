@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
@@ -61,6 +61,7 @@ export default function ResultPage() {
   const [showPermissionQuestion, setShowPermissionQuestion] = useState(false)
   const [permissionType, setPermissionType] = useState<"revelation" | "sensitive" | "deep" | null>(null)
   const [pendingRevelation, setPendingRevelation] = useState<(() => void) | null>(null)
+  const [isRedirecting, setIsRedirecting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { playSound, playRevelation, playMotivation } = useAudio()
   const { scrollContainerRef } = useAutoScroll({ messages, isTyping })
@@ -243,8 +244,10 @@ export default function ResultPage() {
   }
 
   const handleMainCTA = async () => {
+    console.log("[Checkout] Button clicked, handleMainCTA called")
     addMessage("user", "I'm ready to see who I really am — $47")
     setShowChoices(false)
+    setIsRedirecting(true)
 
     await showTyping(getTypingDelay("action"))
     addMessage("assistant", "Good choice.", "motivation")
@@ -266,6 +269,7 @@ export default function ResultPage() {
 
     // Create Stripe checkout session server-side then redirect to checkout URL
     try {
+      console.log("[Checkout] Starting checkout session creation...")
       const referralCode = getLocalStorage<string>(STORAGE_KEYS.REFERRAL_CODE) || ""
       const onboarding = getLocalStorage<any>(STORAGE_KEYS.ONBOARDING)
       
@@ -278,6 +282,13 @@ export default function ResultPage() {
         lastName = nameParts.slice(1).join(" ") || ""
       }
       
+      console.log("[Checkout] Sending request to API...", { 
+        email: userEmail, 
+        firstName, 
+        lastName,
+        hasReferralCode: !!referralCode 
+      })
+      
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -289,15 +300,45 @@ export default function ResultPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to create checkout session")
+      console.log("[Checkout] Response status:", response.status, response.statusText)
+
+      if (!response.ok) {
+        let errorData: any = {}
+        try {
+          const responseText = await response.text()
+          errorData = responseText ? JSON.parse(responseText) : {}
+        } catch {
+          // Response is not JSON, use status text
+          errorData = { error: response.statusText || `Server error (${response.status})` }
+        }
+        
+        console.error("[Checkout] API error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error || "Unknown error"
+        })
+        
+        throw new Error(errorData.error || `Failed to create checkout session (${response.status})`)
+      }
+      
       const data = await response.json()
+      console.log("[Checkout] Response data:", data)
+      
       if (data?.url) {
+        console.log("[Checkout] Redirecting to:", data.url)
+        // Redirect to Stripe checkout
         window.location.href = data.url
       } else {
+        console.error("[Checkout] No URL in response:", data)
         throw new Error("No checkout URL returned")
       }
-    } catch {
-      // Silent error handling for Stripe checkout - user will see the error on Stripe's side
+    } catch (error) {
+      console.error("[Checkout] Error creating checkout session:", error)
+      setIsRedirecting(false)
+      setShowChoices(true)
+      await showTyping(getTypingDelay("introspection"))
+      const errorMessage = error instanceof Error ? error.message : "We encountered an issue. Please try again."
+      addMessage("assistant", errorMessage, "introspection")
     }
   }
 
@@ -431,6 +472,24 @@ export default function ResultPage() {
   }
 
   const progressPercentage = (timeLeft / (7 * 60)) * 100
+
+  // Memoize previewRevelations to avoid recalculating on every render
+  const previewRevelations = useMemo(() => {
+    if (!showPreview || !finalReport || !finalReport.profile) {
+      return null
+    }
+    
+    try {
+      const allRevelations = generateInsights(phasesResults, finalReport.profile)
+      return allRevelations.slice(0, 3).map((r, i) => ({
+        text: r.insight,
+        index: i + 1
+      }))
+    } catch (error) {
+      console.error("Error generating preview revelations:", error)
+      return null
+    }
+  }, [showPreview, finalReport, phasesResults])
 
   const handleForceReveal = (forceName: string) => {
     // Ask for permission for sensitive revelations (Shadow and Fear)
@@ -751,24 +810,17 @@ export default function ResultPage() {
           )}
 
           {/* Preview Teaser - Stays visible once shown */}
-          {showPreview && finalReport && (() => {
-            const allRevelations = generateInsights(phasesResults, finalReport.profile)
-            const previewRevelations = allRevelations.slice(0, 3).map((r, i) => ({
-              text: r.insight,
-              index: i + 1
-            }))
-            return (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="sticky top-4 z-10"
-              >
-                <PreviewTeaser
-                  revelations={previewRevelations}
-                />
-              </motion.div>
-            )
-          })()}
+          {previewRevelations && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="fixed top-4 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4 z-50"
+            >
+              <PreviewTeaser
+                revelations={previewRevelations}
+              />
+            </motion.div>
+          )}
 
           {isTyping && (
             <motion.div
@@ -832,7 +884,8 @@ export default function ResultPage() {
               <div className="px-4 pt-4 pb-4 flex flex-col gap-3">
                 <motion.button
                   onClick={handleMainCTA}
-                  className="relative rounded-2xl bg-gradient-to-r from-red-500 via-red-600 to-red-500 bg-[length:200%_100%] px-6 py-4 text-center font-bold text-white shadow-lg shadow-red-500/50 overflow-hidden"
+                  disabled={isRedirecting}
+                  className="relative rounded-2xl bg-gradient-to-r from-red-500 via-red-600 to-red-500 bg-[length:200%_100%] px-6 py-4 text-center font-bold text-white shadow-lg shadow-red-500/50 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                   animate={{
                     backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
                     boxShadow: [
@@ -845,10 +898,12 @@ export default function ResultPage() {
                     backgroundPosition: { duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" },
                     boxShadow: { duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" },
                   }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: isRedirecting ? 1 : 1.02 }}
+                  whileTap={{ scale: isRedirecting ? 1 : 0.98 }}
                 >
-                  <span className="relative z-10">I'm ready to see who I really am — $47</span>
+                  <span className="relative z-10">
+                    {isRedirecting ? "Redirecting to checkout..." : "I'm ready to see who I really am — $47"}
+                  </span>
                 </motion.button>
                 <p className="text-xs text-gray-400 text-center">
                   + 10 personalized ebooks revealed after purchase (value $200)

@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { useState, useEffect } from "react"
+import { useState, useEffect, memo } from "react"
 
 interface Revelation {
   text: string
@@ -12,31 +12,23 @@ interface PreviewTeaserProps {
   revelations: Revelation[]
 }
 
-export default function PreviewTeaser({ revelations }: PreviewTeaserProps) {
+function PreviewTeaser({ revelations }: PreviewTeaserProps) {
   const [revealedIndex, setRevealedIndex] = useState(-1)
-  const [blurAmount, setBlurAmount] = useState(10)
 
   useEffect(() => {
-    // Reveal first revelation after 1 second
-    const timer1 = setTimeout(() => {
-      setRevealedIndex(0)
-      setBlurAmount(0)
-    }, 1000)
+    // Consolidated timers: delays in milliseconds for each revelation reveal
+    const revealDelays = [1000, 3000, 5000]
+    const timers: NodeJS.Timeout[] = []
 
-    // Reveal second after 3 seconds
-    const timer2 = setTimeout(() => {
-      setRevealedIndex(1)
-    }, 3000)
-
-    // Reveal third after 5 seconds
-    const timer3 = setTimeout(() => {
-      setRevealedIndex(2)
-    }, 5000)
+    revealDelays.forEach((delay, index) => {
+      const timer = setTimeout(() => {
+        setRevealedIndex(index)
+      }, delay)
+      timers.push(timer)
+    })
 
     return () => {
-      clearTimeout(timer1)
-      clearTimeout(timer2)
-      clearTimeout(timer3)
+      timers.forEach(timer => clearTimeout(timer))
     }
   }, [])
 
@@ -52,14 +44,15 @@ export default function PreviewTeaser({ revelations }: PreviewTeaserProps) {
       </div>
 
       <div className="space-y-3">
-        {revelations.map((revelation, index) => (
-          <AnimatePresence key={revelation.index}>
-            {revealedIndex >= index && (
+        <AnimatePresence>
+          {revelations.map((revelation, index) => 
+            revealedIndex >= index ? (
               <motion.div
+                key={revelation.index}
                 initial={{ opacity: 0, filter: "blur(10px)" }}
                 animate={{ 
                   opacity: 1, 
-                  filter: `blur(${revealedIndex === index ? blurAmount : 0}px)`,
+                  filter: "blur(0px)",
                 }}
                 exit={{ opacity: 0 }}
                 transition={{ 
@@ -97,9 +90,9 @@ export default function PreviewTeaser({ revelations }: PreviewTeaserProps) {
                   </motion.div>
                 )}
               </motion.div>
-            )}
-          </AnimatePresence>
-        ))}
+            ) : null
+          )}
+        </AnimatePresence>
       </div>
 
       <motion.p
@@ -112,4 +105,6 @@ export default function PreviewTeaser({ revelations }: PreviewTeaserProps) {
     </motion.div>
   )
 }
+
+export default memo(PreviewTeaser)
 

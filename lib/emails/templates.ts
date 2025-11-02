@@ -125,6 +125,7 @@ export function getBaseEmailTemplate(content: string, userName?: string): string
 export function getPaymentConfirmationTemplate(data: {
   userName: string
   reportUrl?: string
+  booksUrl?: string
 }): string {
   const content = `
     <p>Your payment has been confirmed. Your complete LifeClock report is attached to this email.</p>
@@ -137,7 +138,18 @@ export function getPaymentConfirmationTemplate(data: {
       <li>Your life curve visualization</li>
       <li>10 free personalized ebooks (one per phase)</li>
     </ul>
-    ${data.reportUrl ? `<p><a href="${data.reportUrl}" class="button">View Report Online</a></p>` : ''}
+    
+    <div style="margin: 30px 0;">
+      ${data.booksUrl ? `
+        <p style="margin-bottom: 15px;"><a href="${data.booksUrl}" class="button" style="font-size: 16px; padding: 16px 32px; display: inline-block; text-align: center; width: 100%; max-width: 400px;">Download Your 10 Books</a></p>
+      ` : ''}
+      ${data.reportUrl ? `
+        <p style="margin-bottom: 15px; text-align: center;">
+          <a href="${data.reportUrl}" style="display: inline-block; padding: 12px 24px; border: 2px solid rgba(255, 255, 255, 0.3); color: #E5E7EB; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s;">View My Full Report</a>
+        </p>
+      ` : ''}
+    </div>
+    
     <p>Take your time to explore these insights. They reveal patterns that have shaped your journey.</p>
     
     <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 20px; margin: 30px 0;">

@@ -98,7 +98,7 @@ export default function PDFExportButton({ userName, finalReport, forces, revelat
                 ${rev.category.toUpperCase()}
               </div>
               <div style="color: #D1D5DB; font-size: 14px;">
-                ${rev.text}
+                ${rev.insight || rev.text || ''}
               </div>
             </div>
           `,

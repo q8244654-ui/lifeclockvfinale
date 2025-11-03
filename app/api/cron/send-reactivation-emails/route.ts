@@ -4,6 +4,7 @@ import { sendReactivationEmail } from "@/lib/emails"
 import { getTodayCompletedReportsCount } from "@/lib/supabase/stats"
 
 export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 const CRON_SECRET = process.env.CRON_SECRET
 
@@ -97,5 +98,10 @@ export async function POST(request: Request) {
     console.error("[Reactivation Emails] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
+
+// Vercel Cron déclenche des requêtes GET par défaut
+export async function GET(request: Request) {
+  return POST(request)
 }
 

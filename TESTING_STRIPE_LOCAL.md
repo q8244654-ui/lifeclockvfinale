@@ -240,3 +240,4 @@ stripe trigger payment_intent.succeeded
 - [ ] Testé avec une carte de test
 - [ ] Webhook reçu et traité correctement
 
+

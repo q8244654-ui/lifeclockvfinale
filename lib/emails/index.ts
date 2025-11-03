@@ -108,6 +108,7 @@ export async function sendPaymentConfirmationEmail(data: PaymentConfirmationData
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     const reportUrl = data.reportUrl || `${baseUrl}/report`
     const booksUrl = data.booksUrl || `${baseUrl}/books`
+    const bonusUrl = data.bonusUrl || `${baseUrl}/bonus/new-testament`
 
     let pdfBuffer: Buffer | null = null
     try {
@@ -123,6 +124,7 @@ export async function sendPaymentConfirmationEmail(data: PaymentConfirmationData
       userName: data.userName,
       reportUrl,
       booksUrl,
+      bonusUrl,
     })
 
     const attachments = pdfBuffer

@@ -39,7 +39,10 @@ export default function Revelations({ revelations }: RevelationsProps) {
               <div className="text-2xl">{revelation.icon}</div>
               <div className="flex-1 space-y-1">
                 <h3 className="text-sm font-semibold text-white">{revelation.title}</h3>
-                <p className="text-sm text-gray-300">{revelation.insight}</p>
+                <p 
+                  className="text-sm text-gray-300"
+                  dangerouslySetInnerHTML={{ __html: revelation.insight.replace(/\n\n/g, '<br /><br />') }}
+                />
               </div>
             </div>
           </motion.div>

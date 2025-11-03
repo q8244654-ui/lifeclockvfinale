@@ -1,10 +1,311 @@
 import type { PhaseResult, EnergyProfile } from "./types"
+import { PHASE_QUOTES } from "./phases/quotes"
 
 export interface Revelation {
   category: "phase" | "energy" | "pattern" | "extreme" | "contradiction" | "force"
   title: string
   insight: string
   icon: string
+}
+
+// --- Sentence-level de-duplication helpers ---
+function normalizeSentence(input: string): string {
+  if (!input) return ""
+  // Remove HTML tags (keep inner text), especially <span class="quote-gold">
+  const withoutHtml = input.replace(/<[^>]+>/g, " ")
+  // Remove surrounding quotes and backticks
+  let strippedQuotes = withoutHtml.replace(/^\s*["'“”‘’`]+|["'“”‘’`]+\s*$/g, " ")
+  // Collapse whitespace
+  strippedQuotes = strippedQuotes.replace(/\s+/g, " ").trim()
+  // Remove terminal punctuation (one or more) and trailing spaces
+  strippedQuotes = strippedQuotes.replace(/[.!?…\s]+$/g, "").trim()
+  // Lowercase for comparison
+  const lower = strippedQuotes.toLowerCase()
+  // Optionally strip diacritics
+  const ascii = lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  return ascii
+}
+
+function splitIntoSentencesKeepingQuotes(text: string): string[] {
+  if (!text) return []
+  // First split by paragraph to preserve structure
+  const paragraphs = text.split(/\n\n+/)
+  const sentences: string[] = []
+  paragraphs.forEach((p) => {
+    // Try to preserve quoted blocks as whole sentences
+    // e.g., <span class="quote-gold">"..."</span> or plain "..."
+    const parts = p
+      .split(/(?<=[.!?…])\s+(?=[A-ZÀ-ÖØ-Þ"“\<])/g) // split on sentence boundaries, keep caps/quotes/spans starts
+      .map(s => s.trim())
+      .filter(Boolean)
+    sentences.push(...parts)
+  })
+  return sentences
+}
+
+function ensureNonEmptyInsight(filteredSentences: string[], original: string): string {
+  if (filteredSentences.length > 0) {
+    return filteredSentences.join(" \n\n")
+  }
+  // fallback: keep first sentence of original
+  const first = splitIntoSentencesKeepingQuotes(original)[0]
+  return first ? first : original
+}
+
+export function enforceUniqueSentencesAcrossRevelations(revs: Revelation[]): Revelation[] {
+  const seen = new Set<string>()
+  return revs.map((rev) => {
+    const parts = splitIntoSentencesKeepingQuotes(rev.insight)
+    const kept: string[] = []
+    for (const s of parts) {
+      const norm = normalizeSentence(s)
+      if (!norm) continue
+      if (seen.has(norm)) continue
+      seen.add(norm)
+      kept.push(s)
+    }
+    const insight = ensureNonEmptyInsight(kept, rev.insight)
+    return { ...rev, insight }
+  })
+}
+
+function addGoldenQuotesEnsuringUniqueness(
+  revs: Revelation[],
+  phasesResults: PhaseResult[],
+  energyProfile: EnergyProfile
+): Revelation[] {
+  const seen = new Set<string>()
+  // Seed seen with already present sentences to avoid adding duplicates
+  revs.forEach(r => {
+    splitIntoSentencesKeepingQuotes(r.insight).forEach(s => {
+      const n = normalizeSentence(s)
+      if (n) seen.add(n)
+    })
+  })
+
+  return revs.map((rev, idx) => {
+    if (rev.insight.includes('<span class="quote-gold">')) return rev
+    const pools = getQuotePoolsForRevelation(rev, phasesResults, energyProfile)
+    const combined = pools.flat()
+    const seed = `${idx}-${rev.title}`
+    const picks = pickDeterministic(combined, Math.min(5, combined.length), seed)
+    let chosen: string | undefined
+    for (const q of picks) {
+      const n = normalizeSentence(q)
+      if (!n || seen.has(n)) continue
+      chosen = q
+      seen.add(n)
+      break
+    }
+    // Fallback to any quote (even si déjà vu) si rien d'unique trouvé
+    if (!chosen && combined.length) {
+      chosen = combined[0]
+    }
+    if (!chosen) return rev
+    const quoteBlock = `<span class="quote-gold">"${chosen}"</span>`
+    const parts = rev.insight.split("\n\n")
+    const newInsight = [quoteBlock, ...parts].join("\n\n")
+    return { ...rev, insight: newInsight }
+  })
+}
+
+// Deterministic selection utilities for multi-citation injection
+function hashString(input: string): number {
+  let h = 2166136261 >>> 0 // FNV-1a basis
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+function nextRand(state: number): number {
+  // Simple xorshift32
+  state ^= state << 13
+  state ^= state >>> 17
+  state ^= state << 5
+  return state >>> 0
+}
+
+export function pickDeterministic<T>(items: readonly T[], count: number, seed: string): T[] {
+  const result: T[] = []
+  if (!items.length || count <= 0) return result
+  const used = new Set<number>()
+  let state = hashString(seed) || 1
+  const limit = Math.min(count, items.length)
+  while (result.length < limit) {
+    state = nextRand(state)
+    const idx = state % items.length
+    if (used.has(idx)) continue
+    used.add(idx)
+    result.push(items[idx])
+  }
+  return result
+}
+
+type QuotePool = readonly string[]
+
+function getTopPhases(phasesResults: PhaseResult[], topN: number): number[] {
+  return [...phasesResults]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, topN)
+    .map(p => p.id)
+}
+
+function phasesToPools(phaseIds: number[]): QuotePool[] {
+  return phaseIds.map(id => PHASE_QUOTES[id as keyof typeof PHASE_QUOTES] as QuotePool)
+}
+
+export function getQuotePoolsForRevelation(
+  revelation: Revelation,
+  phasesResults: PhaseResult[],
+  energyProfile: EnergyProfile
+): QuotePool[] {
+  // Phase-specific
+  if (revelation.category === "phase") {
+    const match = revelation.title.match(/Phase\s+(\d+)/)
+    const id = match ? parseInt(match[1], 10) : undefined
+    if (id && PHASE_QUOTES[id as keyof typeof PHASE_QUOTES]) {
+      return [PHASE_QUOTES[id as keyof typeof PHASE_QUOTES] as QuotePool]
+    }
+  }
+
+  // Energy mapping
+  if (revelation.category === "energy") {
+    const energy = revelation.title.replace("Energy ", "")
+    let mappedPhases: number[] = []
+    if (energy === "Mind") mappedPhases = [1, 2, 8]
+    else if (energy === "Heart") mappedPhases = [3, 4, 9]
+    else if (energy === "Drive") mappedPhases = [5, 7, 8]
+    else if (energy === "Spirit") mappedPhases = [4, 9, 10]
+    return phasesToPools(mappedPhases)
+  }
+
+  // Patterns & Contradictions: top 3 phases
+  if (revelation.category === "pattern" || revelation.category === "contradiction") {
+    const top = getTopPhases(phasesResults, 3)
+    return phasesToPools(top)
+  }
+
+  // Extremes: top phase
+  if (revelation.category === "extreme") {
+    const top = getTopPhases(phasesResults, 1)
+    return phasesToPools(top)
+  }
+
+  // Forces: combine groups to cover major axes
+  if (revelation.category === "force") {
+    const group: number[] = [1, 2, 7, 3, 8, 4, 10, 5, 6, 9]
+    return phasesToPools(group)
+  }
+
+  // Fallback: top 2 phases
+  const top = getTopPhases(phasesResults, 2)
+  return phasesToPools(top)
+}
+
+// 24 citations de la Phase 1 - THE MASK (EGO)
+const PHASE_1_MASK_QUOTES = [
+  "Whoever exalts himself will be humbled; whoever humbles himself will be exalted. (Luke 14:11)",
+  "Pride is the fog that hides the soul's horizon.",
+  "The mask is born from fear — fear of not being loved.",
+  "The ego is the wound that pretends to be the healer.",
+  "Do not seek to appear; seek to be.",
+  "When you stop trying to impress, you start to express.",
+  "The mask falls when truth becomes more valuable than applause.",
+  "Whoever hides his weakness also hides his light.",
+  "A man who seeks validation is still a child in disguise.",
+  "True strength is silent, not showy.",
+  "The one who boasts about his goodness has already lost it.",
+  "Hypocrisy is self-hatred wearing perfume.",
+  "Authenticity is not rebellion — it is alignment.",
+  "Let your yes be yes and your no be no. (Matthew 5:37)",
+  "You are not what others think — you are what God whispers.",
+  "Ego seeks to dominate; spirit seeks to illuminate.",
+  "Your masks may fool the world, but they tire the soul.",
+  "Self-awareness is the sword that cuts illusion.",
+  "Whoever walks in humility walks in peace.",
+  "To know yourself is to stop pretending.",
+  "The mask hides pain; honesty heals it.",
+  "You cannot fake light — it either shines or it doesn't.",
+  "The proud fall because they stand on nothing.",
+  "In losing image, you gain essence.",
+  "The divine can only enter through the cracks of your humility.",
+]
+
+/**
+ * Génère un hash simple à partir d'une string pour créer une distribution déterministe
+ */
+function simpleHash(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32bit integer
+  }
+  return Math.abs(hash)
+}
+
+/**
+ * Distribue les citations de manière unique et déterministe parmi les révélations
+ * Chaque utilisateur aura une distribution unique mais déterministe basée sur ses résultats
+ */
+function distributeQuotesAmongRevelations(
+  revelations: Revelation[],
+  userSignature: string
+): Revelation[] {
+  // Créer un hash de base à partir de la signature utilisateur
+  const baseHash = simpleHash(userSignature)
+  
+  // Créer une permutation déterministe des indices de citations
+  const quoteIndices = Array.from({ length: PHASE_1_MASK_QUOTES.length }, (_, i) => i)
+  
+  // Mélanger les indices de manière déterministe (Fisher-Yates avec seed)
+  for (let i = quoteIndices.length - 1; i > 0; i--) {
+    const j = (baseHash + i * 7) % (i + 1)
+    ;[quoteIndices[i], quoteIndices[j]] = [quoteIndices[j], quoteIndices[i]]
+  }
+  
+  // Étendre les citations pour couvrir toutes les révélations (47)
+  // Les citations seront réutilisées mais de manière distribuée
+  const getQuoteForIndex = (index: number): string => {
+    // Utiliser un pattern basé sur le hash pour distribuer les citations
+    const quotePos = (baseHash + index * 13) % PHASE_1_MASK_QUOTES.length
+    return PHASE_1_MASK_QUOTES[quoteIndices[quotePos]]
+  }
+  
+  // Appliquer les citations aux révélations
+  return revelations.map((revelation, index) => {
+    const quote = getQuoteForIndex(index)
+    
+    // Pour la Phase 1, intégrer la citation dans le texte existant
+    if (revelation.title.startsWith("Phase 1:")) {
+      // Insérer la citation au début de l'insight
+      return {
+        ...revelation,
+        insight: `"${quote}"\n\n${revelation.insight}`,
+      }
+    }
+    
+    // Pour les autres révélations, insérer la citation de manière élégante
+    // Chercher un endroit naturel dans le texte
+    const insightLines = revelation.insight.split('\n\n')
+    
+    if (insightLines.length > 1) {
+      // Si l'insight a plusieurs paragraphes, insérer la citation après le premier paragraphe
+      const newInsight = [insightLines[0], `"${quote}"`, ...insightLines.slice(1)].join('\n\n')
+      return {
+        ...revelation,
+        insight: newInsight,
+      }
+    } else {
+      // Sinon, mettre la citation au début
+      return {
+        ...revelation,
+        insight: `"${quote}"\n\n${revelation.insight}`,
+      }
+    }
+  })
 }
 
 // Helper function to generate phase revelation based on score and archetype
@@ -530,5 +831,55 @@ Never forget it. Never take it for granted. Never underestimate its value. You h
     })
   })
 
-  return revelations
+  // Multi-citations par catégorie (2–3 par élément)
+  function limitAddedLength(original: string, updated: string, maxAdditional: number): string {
+    const extra = updated.length - original.length
+    if (extra <= maxAdditional) return updated
+    const target = original.length + maxAdditional
+    if (updated.length <= target) return updated
+    return updated.slice(0, target - 1) + "…"
+  }
+
+  const withMultiCitations = revelations.map((rev, idx) => {
+    const count = rev.category === "phase" ? 3 : rev.category === "force" ? 3 : 2
+    const pools = getQuotePoolsForRevelation(rev, phasesResults, energyProfile)
+    const seed = `${idx}-${rev.title}`
+    const combined = pools.flat()
+    const picks = pickDeterministic(combined, count, seed)
+
+    if (!picks.length) return rev
+    const paragraphs = rev.insight.split("\n\n")
+    const parts: string[] = []
+    parts.push(`<span class="quote-gold">"${picks[0]}"</span>`)
+    parts.push(paragraphs[0])
+    if (picks[1]) parts.push(`<span class="quote-gold">"${picks[1]}"</span>`)
+    if (paragraphs.length > 1) parts.push(...paragraphs.slice(1))
+    if (picks[2]) parts.push(`<span class="quote-gold">"${picks[2]}"</span>`)
+    const updated = parts.join("\n\n")
+    const limited = limitAddedLength(rev.insight, updated, 600)
+    return { ...rev, insight: limited }
+  })
+
+  // Créer une signature unique basée sur les résultats de l'utilisateur
+  const userSignature = JSON.stringify({
+    phases: phasesResults.map(p => ({ id: p.id, total: p.total, archetype: p.archetype })),
+    energies: energyProfile.averages,
+  })
+
+  // Distribuer (complément) des citations uniques ponctuelles si besoin
+  const finalized = distributeQuotesAmongRevelations(withMultiCitations, userSignature)
+
+  // Enforcer l'unicité des phrases à travers toutes les révélations
+  const deduped = enforceUniqueSentencesAcrossRevelations(finalized)
+
+  // S'assurer d'au moins une citation "or" par révélation, en évitant les doublons
+  const withGuaranteedGolden = addGoldenQuotesEnsuringUniqueness(deduped, phasesResults, energyProfile)
+
+  // Numérotation 1..47 des révélations dans l'ordre final
+  const numbered = withGuaranteedGolden.map((rev, idx) => ({
+    ...rev,
+    title: `${idx + 1}. ${rev.title}`,
+  }))
+
+  return numbered
 }

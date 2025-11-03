@@ -10,6 +10,7 @@ import {
 } from "@/lib/emails"
 
 export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -21,7 +22,7 @@ if (!webhookSecret) {
   throw new Error("Missing STRIPE_WEBHOOK_SECRET")
 }
 
-const stripe = new Stripe(stripeSecretKey, { apiVersion: "2025-10-29.clover" })
+const stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-06-20" })
 
 export async function POST(request: Request) {
   // Rate limiting for webhook endpoint

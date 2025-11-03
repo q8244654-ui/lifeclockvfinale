@@ -126,6 +126,7 @@ export function getPaymentConfirmationTemplate(data: {
   userName: string
   reportUrl?: string
   booksUrl?: string
+  bonusUrl?: string
 }): string {
   const content = `
     <p>Your payment has been confirmed. Your complete LifeClock report is attached to this email.</p>
@@ -140,6 +141,9 @@ export function getPaymentConfirmationTemplate(data: {
     </ul>
     
     <div style="margin: 30px 0;">
+      ${data.bonusUrl ? `
+        <p style="margin-bottom: 15px;"><a href="${data.bonusUrl}" class="button" style="font-size: 16px; padding: 16px 32px; display: inline-block; text-align: center; width: 100%; max-width: 400px; background: linear-gradient(135deg, #E5C97E 0%, #d4b169 100%); color: #0A0A0A;">Access New Testament Bonus</a></p>
+      ` : ''}
       ${data.booksUrl ? `
         <p style="margin-bottom: 15px;"><a href="${data.booksUrl}" class="button" style="font-size: 16px; padding: 16px 32px; display: inline-block; text-align: center; width: 100%; max-width: 400px;">Download Your 10 Books</a></p>
       ` : ''}

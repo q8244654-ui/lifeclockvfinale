@@ -17,6 +17,7 @@ export interface PaymentConfirmationData {
   revelations: any[]
   reportUrl?: string
   booksUrl?: string
+  bonusUrl?: string
 }
 
 export interface AbandonedCartData {

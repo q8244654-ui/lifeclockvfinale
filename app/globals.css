@@ -269,3 +269,11 @@ body {
 .shadow-soft-dark {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
+
+/* Gold quotes styling */
+.quote-gold {
+  color: #D4AF37;
+  font-style: italic;
+  font-weight: 500;
+  display: inline-block;
+}

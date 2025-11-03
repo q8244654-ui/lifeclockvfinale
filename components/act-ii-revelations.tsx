@@ -139,9 +139,8 @@ export default function ActIIRevelations({ revelations, userName, finalReport, f
                     <p
                       className="text-[#BFBFC2] text-base leading-relaxed"
                       style={{ fontFamily: "var(--font-body)" }}
-                    >
-                      {revelation.insight}
-                    </p>
+                      dangerouslySetInnerHTML={{ __html: revelation.insight.replace(/\n\n/g, '<br /><br />') }}
+                    />
                   </div>
                 </div>
               </motion.div>

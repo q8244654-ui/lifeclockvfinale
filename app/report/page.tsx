@@ -106,6 +106,25 @@ export default function ReportPage() {
 
   return (
     <div className="bg-[#0A0A0A] text-white">
+      {/* Quick Navigation Buttons */}
+      <div className="sticky top-0 z-20 bg-[#0A0A0A]/70 backdrop-blur px-4 py-3 border-b border-white/10">
+        <div className="max-w-6xl mx-auto flex items-center gap-3 justify-end">
+          <a
+            href="/books"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-[#FAFAFA] hover:bg-white/10 transition"
+            style={{ fontFamily: "var(--font-body)" }}
+          >
+            Back to Ebook
+          </a>
+          <a
+            href="/bonus/new-testament"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-[#FAFAFA] hover:bg-white/10 transition"
+            style={{ fontFamily: "var(--font-body)" }}
+          >
+            Back to Bonus
+          </a>
+        </div>
+      </div>
       {/* Act I: The Portal Opens */}
       <ActIPortal 
         lifeIndex={finalReport.lifeIndex.lifeIndex} 
@@ -245,6 +264,113 @@ export default function ReportPage() {
           </motion.div>
         </div>
       </div>
+
+    {/* Bonus: The New Testament (same UI) */}
+    <div className="relative min-h-screen bg-[#0A0A0A] py-24 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+        >
+          <h2
+            className="text-4xl md:text-5xl font-bold text-[#FAFAFA] mb-4 uppercase tracking-wide"
+            style={{ fontFamily: "var(--font-title)" }}
+          >
+            The New Testament (Bonus)
+          </h2>
+          <p className="text-[#BFBFC2] text-lg" style={{ fontFamily: "var(--font-body)" }}>
+            Access the full PDF instantly. Keep it for your personal study and inspiration.
+          </p>
+        </motion.div>
+
+        {/* Main Card */}
+        <motion.div
+          className="mb-16"
+          initial={{ opacity: 0, scale: 0.9 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+        >
+          <div className="relative backdrop-blur-xl border border-[#E5C97E]/30 rounded-2xl p-8 md:p-12 overflow-hidden">
+            {/* Glowing background */}
+            <motion.div
+              className="absolute inset-0"
+              style={{
+                background: "radial-gradient(circle at center, rgba(229, 201, 126, 0.15) 0%, transparent 70%)",
+              }}
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+                scale: [1, 1.1, 1],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+              }}
+            />
+
+            <div className="relative z-10 text-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                whileInView={{ scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ type: "spring", delay: 0.4 }}
+                className="inline-block mb-8"
+              >
+                <div className="w-20 h-20 rounded-xl bg-[#E5C97E]/20 border border-[#E5C97E]/30 flex items-center justify-center">
+                  <BookOpen className="w-10 h-10 text-[#E5C97E]" />
+                </div>
+              </motion.div>
+
+              <h3
+                className="text-3xl md:text-4xl font-bold text-[#FAFAFA] mb-4"
+                style={{ fontFamily: "var(--font-title)" }}
+              >
+                Bonus Access
+              </h3>
+              <p className="text-[#BFBFC2] text-lg mb-8" style={{ fontFamily: "var(--font-body)" }}>
+                Enjoy this complimentary bonus in digital format
+              </p>
+
+              <motion.a
+                href="/books/The%20New%20Testament.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 rounded-xl text-[#0A0A0A] font-semibold relative overflow-hidden inline-flex items-center gap-3"
+                style={{
+                  background: "linear-gradient(135deg, rgba(229, 201, 126, 0.9) 0%, rgba(229, 201, 126, 0.7) 100%)",
+                  fontFamily: "var(--font-body)",
+                  boxShadow: "0 4px 16px rgba(229, 201, 126, 0.3)",
+                }}
+              >
+                <motion.div
+                  className="absolute inset-0"
+                  style={{
+                    background: "radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%)",
+                  }}
+                  animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.2, 1] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "easeInOut",
+                  }}
+                />
+                <span className="relative z-10 flex items-center gap-3">
+                  <BookOpen className="w-5 h-5" />
+                  Open PDF
+                </span>
+              </motion.a>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
     </div>
   )
 }

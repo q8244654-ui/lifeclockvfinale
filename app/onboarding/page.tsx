@@ -371,41 +371,50 @@ export default function OnboardingPage() {
 
                     setLocalStorage(STORAGE_KEYS.ONBOARDING, finalData)
 
-                    const supabase = createClient()
+                    let supabaseClient: ReturnType<typeof createClient> | null = null
+                    try {
+                      supabaseClient = createClient()
+                    } catch (e) {
+                      console.error("[onboarding] Supabase client init error:", e)
+                    }
                     ;(async () => {
+                      if (!supabaseClient) return
                       try {
-                        const { error } = await supabase
+                        const { error } = await supabaseClient
                           .from("onboarding_data")
-                          .insert({
-                            name: finalData.name,
-                            age: finalData.age,
-                            gender: finalData.gender,
-                            email: finalData.email,
-                            referral_code: finalData.referral_code,
-                          })
+                          .upsert(
+                            {
+                              name: finalData.name,
+                              age: finalData.age,
+                              gender: finalData.gender,
+                              email: finalData.email,
+                            },
+                            { onConflict: "email" }
+                          )
 
-                        // Errors are handled silently - data is saved in localStorage as fallback
                         if (error) {
-                          // Error handling is silent for UX
+                          console.error("[onboarding] Failed to upsert onboarding_data:", error)
                         }
-                      } catch {
-                        // Exception handling is silent for UX
+                      } catch (e) {
+                        console.error("[onboarding] Exception during upsert onboarding_data:", e)
                       }
                     })()
 
                     const refCode = getLocalStorage<string>(STORAGE_KEYS.REFERRAL_CODE)
                     if (refCode) {
-                      supabase
-                        .from("onboarding_data")
-                        .select("email")
-                        .eq("referral_code", refCode)
+                      const client = supabaseClient
+                      if (!client) return
+                      client
+                        .from("referrals")
+                        .select("referrer_email")
+                        .eq("referrer_code", refCode)
                         .single()
-                        .then(({ data: referrerData, error: referrerError }) => {
-                          if (!referrerError && referrerData) {
-                            supabase
+                        .then(({ data: refRow, error: refLookupError }) => {
+                          if (!refLookupError && refRow?.referrer_email) {
+                            client
                               .from("referrals")
                               .insert({
-                                referrer_email: referrerData.email,
+                                referrer_email: refRow.referrer_email,
                                 referrer_code: refCode,
                                 referred_email: finalData.email,
                                 status: "pending",
@@ -479,8 +488,7 @@ export default function OnboardingPage() {
 
       <div
         ref={scrollContainerRef}
-        className="hide-scrollbar flex-1 overflow-y-auto p-4"
-        style={{ willChange: "transform", contain: "layout paint" }}
+        className="hide-scrollbar flex-1 overflow-y-auto p-4 will-change-transform contain-[layout_paint]"
       >
         <div className="mx-auto flex max-w-md flex-col space-y-1.5 pb-[420px]">
           {messages.map((message, index) => (
@@ -501,7 +509,7 @@ export default function OnboardingPage() {
 
       {canAnswer && (
         <motion.div
-          className="fixed bottom-0 left-0 right-0 border-t border-white/5 bg-gradient-to-t from-black from-70% via-black/95 to-transparent p-4 pt-8 pb-6 backdrop-blur-lg"
+          className="fixed bottom-0 left-0 right-0 border-t border-white/5 bg-linear-to-t from-black from-70% via-black/95 to-transparent p-4 pt-8 pb-6 backdrop-blur-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
@@ -518,14 +526,10 @@ export default function OnboardingPage() {
                     transition={{ delay: index * 0.1 }}
                     whileTap={{ scale: 0.97 }}
                     whileHover={{ scale: 1.01 }}
-                    className={buttonClasses.primary}
-                    style={{
-                      fontFamily: "SF Pro Text, -apple-system, system-ui, sans-serif",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-                    }}
+                    className={`${buttonClasses.primary} font-sans shadow-lg ring-1 ring-white/5`}
                   >
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                      className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent"
                       initial={{ x: "-100%" }}
                       whileHover={{ x: "100%" }}
                       transition={{ duration: 0.6 }}
@@ -547,14 +551,10 @@ export default function OnboardingPage() {
                     transition={{ delay: index * 0.1 }}
                     whileTap={{ scale: 0.97 }}
                     whileHover={{ scale: 1.01 }}
-                    className={buttonClasses.primary}
-                    style={{
-                      fontFamily: "SF Pro Text, -apple-system, system-ui, sans-serif",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-                    }}
+                    className={`${buttonClasses.primary} font-sans shadow-lg ring-1 ring-white/5`}
                   >
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                      className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent"
                       initial={{ x: "-100%" }}
                       whileHover={{ x: "100%" }}
                       transition={{ duration: 0.6 }}
@@ -577,11 +577,7 @@ export default function OnboardingPage() {
                   }
                   min={currentStep === "age" ? 13 : undefined}
                   max={currentStep === "age" ? 120 : undefined}
-                  className={buttonClasses.input}
-                  style={{
-                    fontFamily: "SF Pro Text, -apple-system, system-ui, sans-serif",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-                  }}
+                  className={`${buttonClasses.input} font-sans shadow-lg ring-1 ring-white/5`}
                 />
 
                 <motion.button
@@ -589,13 +585,10 @@ export default function OnboardingPage() {
                   disabled={!inputValue.trim()}
                   whileTap={{ scale: 0.9 }}
                   whileHover={{ scale: inputValue.trim() ? 1.05 : 1 }}
-                  className="flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition-all disabled:opacity-40"
-                  style={{
-                    background: inputValue.trim() ? "linear-gradient(135deg, #007AFF 0%, #0A84FF 100%)" : "#2C2C2E",
-                    boxShadow: inputValue.trim()
-                      ? "0 4px 16px rgba(10, 132, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)"
-                      : "0 2px 8px rgba(0, 0, 0, 0.3)",
-                  }}
+                  className={`flex h-12 w-12 items-center justify-center rounded-full text-white transition-all disabled:opacity-40
+                    ${inputValue.trim()
+                      ? 'bg-linear-to-br from-[#007AFF] to-[#0A84FF] shadow-[0_4px_16px_rgba(10,132,255,0.5),0_2px_4px_rgba(0,0,0,0.3)]'
+                      : 'bg-[#2C2C2E] shadow-lg'}`}
                 >
                   <svg
                     width="20"

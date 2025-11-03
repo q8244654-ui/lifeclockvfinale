@@ -1,6 +1,10 @@
 import Stripe from "stripe"
 import { NextResponse } from "next/server"
 import { createCheckoutSessionSchema } from "@/lib/validators/stripe"
+import { rateLimit } from "@/lib/rate-limit"
+
+// Ensure Node.js runtime for Stripe SDK
+export const runtime = "nodejs"
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 const priceId = process.env.LIFECLOCK_PRICE_ID
@@ -13,11 +17,21 @@ if (!priceId) {
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2025-10-29.clover",
+  apiVersion: "2024-06-20",
 })
 
 export async function POST(request: Request) {
   try {
+    // Simple rate limiting by client IP
+    const clientIp = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+    const limitResult = rateLimit(`checkout:${clientIp}`, {
+      maxTokens: 10,
+      refillRate: 0.5, // 1 request every 2s average
+      windowMs: 60000,
+    })
+    if (!limitResult.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+    }
     console.log("[Stripe API] Request received")
     const body = await request.json()
     console.log("[Stripe API] Body parsed:", { email: body.email, hasReferralCode: !!body.referralCode })
@@ -52,6 +66,8 @@ export async function POST(request: Request) {
 
     console.log("[Stripe API] Creating session with baseUrl:", baseUrl)
 
+    const idempotencyKey = request.headers.get("idempotency-key") || undefined
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
@@ -60,7 +76,7 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/books`,
+      success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/result`,
       // Set checkout page language to English
       locale: "en",
@@ -88,7 +104,7 @@ export async function POST(request: Request) {
         referral_code: referralCode || "",
         referred_email: email || "",
       },
-    })
+    }, idempotencyKey ? { idempotencyKey } : undefined)
 
     console.log("[Stripe API] Session created successfully, URL:", session.url)
     return NextResponse.json({ url: session.url })
